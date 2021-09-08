@@ -36,12 +36,19 @@ def download_shfe_history_data(year: int):
         raise ValueError(f'The year of SHFE history data should be in range {start_year} ~ {dt.date.today().year}.')
 
     # Make sure <save_path> existed.
-    save_path: Path = Path(CONFIGS['path']['download'])
-    if not save_path.exists():
-        save_path.mkdir()
+    download_path: Path = Path(CONFIGS['path']['download'])
+    if not download_path.exists():
+        download_path.mkdir()
 
     response = requests.get(url.format(year=year))
     if response.status_code != 200:
         raise requests.exceptions.HTTPError(f'Error in downloading <{url.format(year=year)}>.')
-    with open(save_path.joinpath(f'SHFE_{year:4d}.zip'), 'wb') as f:
+    with open(download_path.joinpath(f'SHFE_{year:4d}.zip'), 'wb') as f:
         f.write(response.content)
+
+
+def download_shfe_history_data_all():
+    start_year: int = 2009
+    this_year: int = dt.date.today().year
+    for year in range(start_year, this_year + 1):
+        download_shfe_history_data(year)
