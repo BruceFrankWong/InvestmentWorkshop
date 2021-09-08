@@ -6,7 +6,7 @@ __author__ = 'Bruce Frank Wong'
 from pathlib import Path
 
 
-from InvestmentWorkshop.utiltiy import (
+from InvestmentWorkshop.utility import (
     PACKAGE_NAME,
     PACKAGE_PATH,
     CONFIG_PATH,
@@ -19,8 +19,8 @@ def test_package_name():
 
 
 def test_package_path():
-    from InvestmentWorkshop import utiltiy
-    assert PACKAGE_PATH == Path(utiltiy.__file__).parent
+    from InvestmentWorkshop import utility
+    assert PACKAGE_PATH == Path(utility.__file__).parent
 
 
 def test_config_path():
