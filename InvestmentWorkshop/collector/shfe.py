@@ -18,12 +18,13 @@ import datetime as dt
 
 import requests
 
+from ..utility import CONFIGS
 
-def download_shfe_history_data(year: int, save_path: Path):
+
+def download_shfe_history_data(year: int):
     """
     Download history data (yearly) from SHFE.
     :param year:
-    :param save_path:
     :return:
     """
     # Define the url for history data.
@@ -34,6 +35,8 @@ def download_shfe_history_data(year: int, save_path: Path):
     if year < start_year or year > dt.date.today().year:
         raise ValueError(f'The year of SHFE history data should be in range {start_year} ~ {dt.date.today().year}.')
 
+    # Make sure <save_path> existed.
+    save_path: Path = Path(CONFIGS['path']['download'])
     if not save_path.exists():
         save_path.mkdir()
 
