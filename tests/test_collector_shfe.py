@@ -19,13 +19,23 @@ from InvestmentWorkshop.collector.shfe import (
 def test_download_shfe_history_data():
     download_path: Path = Path(CONFIGS['path']['download'])
 
-    year: int = 2021
+    year: int = 2020
     download_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip')
+    backup_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip.backup')
+
+    # Make sure <download_file> does not exist.
     if download_file.exists():
-        download_file.unlink()
+        download_file.rename(backup_file)
     assert download_file.exists() is False
+
+    # Do download and test.
     download_shfe_history_data(year)
     assert download_file.exists() is True
+
+    # Restore.
+    backup_file.unlink()
+    if backup_file.exists():
+        backup_file.rename(f'SHFE_{year:4d}.zip')
 
 
 def test_download_shfe_history_data_all():
