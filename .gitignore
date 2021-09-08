@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# PyCharm
+.idea/
+
+# Project temporary files
+temp/
+
+# Project database
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
