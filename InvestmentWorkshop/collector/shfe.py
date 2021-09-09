@@ -27,6 +27,7 @@ def download_shfe_history_data(year: int):
     :param year:
     :return:
     """
+
     # Define the url for history data.
     url: str = 'http://www.shfe.com.cn/historyData/MarketData_Year_{year:4d}.zip'
 
@@ -48,6 +49,11 @@ def download_shfe_history_data(year: int):
 
 
 def download_shfe_history_data_all():
+    """
+    Download all history data (yearly) from SHFE.
+    :return: None
+    """
+
     start_year: int = 2009
     this_year: int = dt.date.today().year
     for year in range(start_year, this_year + 1):

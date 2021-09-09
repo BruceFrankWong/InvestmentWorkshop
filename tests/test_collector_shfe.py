@@ -17,6 +17,15 @@ from InvestmentWorkshop.collector.shfe import (
 
 
 def test_download_shfe_history_data():
+    """
+    Test for <InvestmentWorkshop.collector.shfe.download_shfe_history_data>.
+
+    1) Assert downloading a new file succeed, if variable <year> is in range [2009, <Current-Year>].
+    2) Assert exception raised if variable <year> is in range [2009, <Current-Year>].
+
+    :return: None
+    """
+
     download_path: Path = Path(CONFIGS['path']['download'])
 
     year: int = 2020
@@ -39,6 +48,14 @@ def test_download_shfe_history_data():
 
 
 def test_download_shfe_history_data_all():
+    """
+    Test for <InvestmentWorkshop.collector.shfe.download_shfe_history_data_all>.
+
+    Assert all files downloaded succeed.
+
+    :return: None
+    """
+
     start_year: int = 2009
     this_year: int = dt.date.today().year
     download_path: Path = Path(CONFIGS['path']['download'])
