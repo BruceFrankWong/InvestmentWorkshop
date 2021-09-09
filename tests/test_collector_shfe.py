@@ -16,6 +16,7 @@ from InvestmentWorkshop.collector.shfe import (
     download_shfe_history_data_all,
     make_directory_existed,
     unzip_quote_file,
+    read_shfe_history_data,
 )
 
 
@@ -170,5 +171,52 @@ def test_unzip_quote_file(download_path, download_year):
     for file in file_list:
         file.unlink()
         assert file.exists() is False
+    download_file.unlink()
+    assert download_file.exists() is False
+
+
+def test_read_shfe_history_data(download_path, download_year):
+    """
+    Test for <InvestmentWorkshop.collector.shfe.read_shfe_history_data>.
+
+    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
+    :param download_year: Test fixture. A random year to download, int.
+    :return:
+    """
+    # Download random history quote file.
+    download_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip')
+    download_shfe_history_data(download_year)
+
+    # Unzip.
+    file_list = unzip_quote_file(download_file)
+
+    for xls_file in file_list:
+        assert xls_file.exists() is True
+        result = read_shfe_history_data(xls_file)
+        assert isinstance(result, list)
+        for item in result:
+            assert isinstance(item, dict)
+            assert isinstance(item['symbol'], str)
+            assert isinstance(item['date'], dt.date)
+            assert isinstance(item['previous_close'], float)
+            assert isinstance(item['previous_settlement'], float)
+            if item['open'] is not None:
+                assert isinstance(item['open'], float)
+            if item['high'] is not None:
+                assert isinstance(item['high'], float)
+            if item['low'] is not None:
+                assert isinstance(item['low'], float)
+            assert isinstance(item['close'], float)
+            assert isinstance(item['settlement'], float)
+            assert isinstance(item['change_on_close'], float)
+            assert isinstance(item['change_on_settlement'], float)
+            assert isinstance(item['volume'], int)
+            assert isinstance(item['amount'], float)
+            assert isinstance(item['open_interest'], int)
+
+        # Make clean.
+        xls_file.unlink()
+        assert xls_file.exists() is False
+
     download_file.unlink()
     assert download_file.exists() is False
