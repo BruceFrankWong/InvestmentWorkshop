@@ -13,6 +13,7 @@ from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.shfe import (
     download_shfe_history_data,
     download_shfe_history_data_all,
+    make_directory_existed,
 )
 
 
@@ -41,8 +42,8 @@ def test_download_shfe_history_data():
     download_shfe_history_data(year)
     assert download_file.exists() is True
 
-    # Restore.
-    backup_file.unlink()
+    # Clean up and restore.
+    download_file.unlink()
     if backup_file.exists():
         backup_file.rename(f'SHFE_{year:4d}.zip')
 
@@ -58,14 +59,51 @@ def test_download_shfe_history_data_all():
 
     start_year: int = 2009
     this_year: int = dt.date.today().year
+
     download_path: Path = Path(CONFIGS['path']['download'])
+    download_file_name: str = 'SHFE_{year:4d}.zip'
+    backup_file_name: str = 'SHFE_{year:4d}.zip.backup'
     download_file_list: List[Path] = []
+    backup_file_list: List[Path] = []
+
+    # Generate file list, and rename the existed file.
     for year in range(start_year, this_year + 1):
-        download_file = download_path.joinpath(f'SHFE_{year:4d}.zip')
+        download_file: Path = download_path.joinpath(download_file_name.format(year=year))
+        backup_file: Path = download_path.joinpath(backup_file_name.format(year=year))
         if download_file.exists():
-            download_file.unlink()
+            download_file.rename(backup_file)
+            backup_file_list.append(backup_file)
         assert download_file.exists() is False
         download_file_list.append(download_file)
+
+    # Do download..
     download_shfe_history_data_all()
+
+    # Test and clean up.
     for download_file in download_file_list:
+        # Test.
         assert download_file.exists() is True
+        # Clean up
+        download_file.unlink()
+
+    # Restore.
+    for backup_file in backup_file_list:
+        backup_file.rename(download_path.joinpath(backup_file.stem))
+
+
+def test_make_directory_existed():
+    """
+    Test for <InvestmentWorkshop.collector.shfe.make_directory_existed>.
+
+    :return: None.
+    """
+    test_path: Path = Path('E:\\a_temporary_test_path')
+    if test_path.exists():
+        test_path.rmdir()
+    assert test_path.exists() is False
+
+    make_directory_existed(test_path)
+    assert test_path.exists() is True
+
+    test_path.rmdir()
+    assert test_path.exists() is False

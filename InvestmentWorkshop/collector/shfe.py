@@ -21,6 +21,16 @@ import requests
 from ..utility import CONFIGS
 
 
+def make_directory_existed(directory: Path):
+    """
+    Make sure <directory> is existed.
+    :param directory: a Python dict object.
+    :return: None
+    """
+    if not directory.exists():
+        directory.mkdir()
+
+
 def download_shfe_history_data(year: int):
     """
     Download history data (yearly) from SHFE.
@@ -38,8 +48,7 @@ def download_shfe_history_data(year: int):
 
     # Make sure <save_path> existed.
     download_path: Path = Path(CONFIGS['path']['download'])
-    if not download_path.exists():
-        download_path.mkdir()
+    make_directory_existed(download_path)
 
     response = requests.get(url.format(year=year))
     if response.status_code != 200:
