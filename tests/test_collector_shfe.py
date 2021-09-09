@@ -3,17 +3,17 @@
 __author__ = 'Bruce Frank Wong'
 
 
-import pytest
-
 from typing import List
 from pathlib import Path
 import datetime as dt
+import random
 
 from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.shfe import (
     download_shfe_history_data,
     download_shfe_history_data_all,
     make_directory_existed,
+    unzip_quote_file,
 )
 
 
@@ -107,3 +107,49 @@ def test_make_directory_existed():
 
     test_path.rmdir()
     assert test_path.exists() is False
+
+
+def test_unzip_quote_file():
+    """
+    Test for <InvestmentWorkshop.collector.shfe.unzip_quote_file>.
+
+    :return: None.
+    """
+    # Generate year to download.
+    year: int = random.randint(2009, dt.date.today().year)
+
+    # Fill the variables.
+    download_path: Path = Path(CONFIGS['path']['download'])
+    unzip_directory: Path = download_path.joinpath('unzip')
+    download_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip')
+    backup_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip.backup')
+
+    # Make sure <download_file> does not exist.
+    if download_file.exists():
+        download_file.rename(backup_file)
+    assert download_file.exists() is False
+
+    # make sure <unzip_directory> existed and empty.
+    if unzip_directory.exists():
+        [x.unlink() for x in unzip_directory.iterdir()]
+    else:
+        unzip_directory.mkdir()
+    assert unzip_directory.exists() is True
+
+    # Download from SHFE.
+    download_shfe_history_data(year)
+    assert download_file.exists() is True
+
+    # Unzip
+    file_list = unzip_quote_file(download_file)
+
+    # Test.
+    for file in file_list:
+        assert file.exists() is True
+
+    # Make clean up.
+    for file in file_list:
+        file.unlink()
+        assert file.exists() is False
+    download_file.unlink()
+    assert download_file.exists() is False
