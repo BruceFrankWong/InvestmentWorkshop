@@ -3,6 +3,8 @@
 __author__ = 'Bruce Frank Wong'
 
 
+import pytest
+
 from typing import List
 from pathlib import Path
 import datetime as dt
@@ -17,21 +19,39 @@ from InvestmentWorkshop.collector.shfe import (
 )
 
 
-def test_download_shfe_history_data():
+@pytest.fixture()
+def download_path() -> Path:
+    """
+    Return download path which configured in <CONFIGS>.
+    :return: a Path-like object.
+    """
+    return Path(CONFIGS['path']['download'])
+
+
+@pytest.fixture()
+def download_year() -> int:
+    """
+    Generate a random year to download.
+    :return: int.
+    """
+    return random.randint(2009, dt.date.today().year)
+
+
+def test_download_shfe_history_data(download_path, download_year):
     """
     Test for <InvestmentWorkshop.collector.shfe.download_shfe_history_data>.
 
     1) Assert downloading a new file succeed, if variable <year> is in range [2009, <Current-Year>].
     2) Assert exception raised if variable <year> is in range [2009, <Current-Year>].
 
+    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
+    :param download_year: Test fixture. A random year to download, int.
     :return: None
     """
 
-    download_path: Path = Path(CONFIGS['path']['download'])
-
-    year: int = 2020
-    download_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip')
-    backup_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip.backup')
+    # Fill the variables.
+    download_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip')
+    backup_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip.backup')
 
     # Make sure <download_file> does not exist.
     if download_file.exists():
@@ -39,7 +59,7 @@ def test_download_shfe_history_data():
     assert download_file.exists() is False
 
     # Do download and test.
-    download_shfe_history_data(year)
+    download_shfe_history_data(download_year)
     assert download_file.exists() is True
 
     # Clean up and restore.
@@ -48,19 +68,19 @@ def test_download_shfe_history_data():
         backup_file.rename(download_file)
 
 
-def test_download_shfe_history_data_all():
+def test_download_shfe_history_data_all(download_path):
     """
     Test for <InvestmentWorkshop.collector.shfe.download_shfe_history_data_all>.
 
     Assert all files downloaded succeed.
 
+    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
     :return: None
     """
 
     start_year: int = 2009
     this_year: int = dt.date.today().year
 
-    download_path: Path = Path(CONFIGS['path']['download'])
     download_file_name: str = 'SHFE_{year:4d}.zip'
     backup_file_name: str = 'SHFE_{year:4d}.zip.backup'
     download_file_list: List[Path] = []
@@ -109,20 +129,19 @@ def test_make_directory_existed():
     assert test_path.exists() is False
 
 
-def test_unzip_quote_file():
+def test_unzip_quote_file(download_path, download_year):
     """
     Test for <InvestmentWorkshop.collector.shfe.unzip_quote_file>.
 
-    :return: None.
+    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
+    :param download_year: Test fixture. A random year to download, int.
+    :return:
     """
-    # Generate year to download.
-    year: int = random.randint(2009, dt.date.today().year)
 
     # Fill the variables.
-    download_path: Path = Path(CONFIGS['path']['download'])
     unzip_directory: Path = download_path.joinpath('unzip')
-    download_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip')
-    backup_file: Path = download_path.joinpath(f'SHFE_{year:4d}.zip.backup')
+    download_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip')
+    backup_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip.backup')
 
     # Make sure <download_file> does not exist.
     if download_file.exists():
@@ -137,7 +156,7 @@ def test_unzip_quote_file():
     assert unzip_directory.exists() is True
 
     # Download from SHFE.
-    download_shfe_history_data(year)
+    download_shfe_history_data(download_year)
     assert download_file.exists() is True
 
     # Unzip
