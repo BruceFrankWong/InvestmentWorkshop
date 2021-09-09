@@ -45,7 +45,7 @@ def test_download_shfe_history_data():
     # Clean up and restore.
     download_file.unlink()
     if backup_file.exists():
-        backup_file.rename(f'SHFE_{year:4d}.zip')
+        backup_file.rename(download_file)
 
 
 def test_download_shfe_history_data_all():
