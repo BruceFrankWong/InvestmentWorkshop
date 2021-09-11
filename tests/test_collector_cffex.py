@@ -72,6 +72,11 @@ def test_download_cffex_history_data(download_path, download_date):
     with pytest.raises(ValueError):
         download_cffex_history_data(dt.date(year=1999, month=5, day=1))
 
+    # make clean.
+    download_file.unlink()
+    print(download_file)
+    assert download_file.exists() is False
+
 
 def test_download_cffex_history_data_all():
     """
@@ -90,7 +95,7 @@ def test_download_cffex_history_data_all():
         for month in range(1, 12 + 1):
             if year == 2010 and month < start_month:
                 continue
-            if year == today.year and month == today.month:
+            if year == today.year and month > today.month:
                 break
             require_list.append(dt.date(year=year, month=month, day=1))
             file_list.append(
@@ -111,3 +116,9 @@ def test_download_cffex_history_data_all():
     # Assert download succeed.
     for download_file in file_list:
         assert download_file.exists() is True
+
+    # make clean.
+    for download_file in file_list:
+        print(download_file)
+        download_file.unlink()
+        assert download_file.exists() is False
