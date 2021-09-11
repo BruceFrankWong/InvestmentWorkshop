@@ -5,9 +5,12 @@ __author__ = 'Bruce Frank Wong'
 
 from typing import Dict, List
 import datetime as dt
+from pathlib import Path
 
 import requests
 from lxml import etree
+
+from ..utility import CONFIGS
 
 
 def fetch_dce_history_index() -> Dict[int, Dict[str, str]]:
@@ -45,3 +48,18 @@ def fetch_dce_history_index() -> Dict[int, Dict[str, str]]:
             result[year_list[i]][product_list[j]] = f'{url_dce}/{url_list[j]}'
 
     return result
+
+
+def download_dce_history_data(year: int) -> None:
+    data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
+    download_path: Path = Path(CONFIGS['path']['download'])
+    for product, url in data_index[year].items():
+        download_file = download_path.joinpath(f'DCE_{product}_{year}.xlsx')
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise requests.exceptions.HTTPError(
+                f'Something wrong in downloading <{url}>.'
+            )
+        with open(download_file, 'wb') as f:
+            f.write(response.content)
+
