@@ -5,6 +5,7 @@ __author__ = 'Bruce Frank Wong'
 
 import pytest
 
+from typing import List
 from pathlib import Path
 import datetime as dt
 import random
@@ -12,6 +13,7 @@ import random
 from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.cffex import (
     download_cffex_history_data,
+    download_cffex_history_data_all,
 )
 
 
@@ -69,3 +71,43 @@ def test_download_cffex_history_data(download_path, download_date):
     # Test for impossible date.
     with pytest.raises(ValueError):
         download_cffex_history_data(dt.date(year=1999, month=5, day=1))
+
+
+def test_download_cffex_history_data_all():
+    """
+    Test for <download_cffex_history_data_all>.
+    :return:
+    """
+    # Generate files.
+    start_year: int = 2010
+    start_month: int = 4
+    today: dt.date = dt.date.today()
+
+    download_path = Path(CONFIGS['path']['download'])
+    file_list: List[Path] = []
+    require_list: List[dt.date] = []
+    for year in range(start_year, today.year + 1):
+        for month in range(1, 12 + 1):
+            if year == 2010 and month < start_month:
+                continue
+            if year == today.year and month == today.month:
+                break
+            require_list.append(dt.date(year=year, month=month, day=1))
+            file_list.append(
+                download_path.joinpath(
+                    f'CFFEX_{year:4d}-{month:02d}.zip'
+                )
+            )
+
+    # Make sure file not existed.
+    for download_file in file_list:
+        if download_file.exists():
+            download_file.unlink()
+        assert download_file.exists() is False
+
+    # Download.
+    download_cffex_history_data_all()
+
+    # Assert download succeed.
+    for download_file in file_list:
+        assert download_file.exists() is True

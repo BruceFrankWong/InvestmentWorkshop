@@ -3,6 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
+from typing import List
 from pathlib import Path
 import datetime as dt
 
@@ -47,3 +48,24 @@ def download_cffex_history_data(month_required: dt.date) -> None:
     # Write to file.
     with open(download_path.joinpath(f'CFFEX_{year:4d}-{month:02d}.zip'), 'wb') as f:
         f.write(response.content)
+
+
+def download_cffex_history_data_all() -> None:
+    """
+    Download all history data (monthly) from CFFEX.
+    :return:
+    """
+    start_year: int = 2010
+    start_month: int = 4
+    today: dt.date = dt.date.today()
+
+    require_list: List[dt.date] = []
+    for year in range(start_year, today.year + 1):
+        for month in range(1, 12 + 1):
+            if year == 2010 and month < start_month:
+                continue
+            if year == today.year and month > today.month:
+                break
+            require_list.append(dt.date(year=year, month=month, day=1))
+    for item in require_list:
+        download_cffex_history_data(item)
