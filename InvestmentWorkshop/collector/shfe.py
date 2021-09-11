@@ -22,16 +22,7 @@ import requests
 import xlrd
 
 from ..utility import CONFIGS
-
-
-def make_directory_existed(directory: Path):
-    """
-    Make sure <directory> is existed.
-    :param directory: a Python dict object.
-    :return: None
-    """
-    if not directory.exists():
-        directory.mkdir()
+from .utility import make_directory_existed
 
 
 def download_shfe_history_data(year: int):

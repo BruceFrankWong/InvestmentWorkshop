@@ -14,7 +14,6 @@ from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.shfe import (
     download_shfe_history_data,
     download_shfe_history_data_all,
-    make_directory_existed,
     unzip_quote_file,
     read_shfe_history_data,
 )
@@ -110,24 +109,6 @@ def test_download_shfe_history_data_all(download_path):
     # Restore.
     for backup_file in backup_file_list:
         backup_file.rename(download_path.joinpath(backup_file.stem))
-
-
-def test_make_directory_existed():
-    """
-    Test for <InvestmentWorkshop.collector.shfe.make_directory_existed>.
-
-    :return: None.
-    """
-    test_path: Path = Path('E:\\a_temporary_test_path')
-    if test_path.exists():
-        test_path.rmdir()
-    assert test_path.exists() is False
-
-    make_directory_existed(test_path)
-    assert test_path.exists() is True
-
-    test_path.rmdir()
-    assert test_path.exists() is False
 
 
 def test_unzip_quote_file(download_path, download_year):
