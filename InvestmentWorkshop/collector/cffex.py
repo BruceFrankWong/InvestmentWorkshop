@@ -3,7 +3,6 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Optional
 from pathlib import Path
 import datetime as dt
 
@@ -13,11 +12,10 @@ from ..utility import CONFIGS
 from .utility import make_directory_existed
 
 
-def download_cffex_history_data(month_required: dt.date, directory: Optional[Path] = None) -> None:
+def download_cffex_history_data(month_required: dt.date) -> None:
     """
     Download history data (monthly) from CFFEX.
     :param month_required:
-    :param directory:
     :return:
     """
     url: str = 'http://www.cffex.com.cn/sj/historysj/{year:4d}{month:02d}/zip/{year:4d}{month:02d}.zip'
@@ -36,11 +34,8 @@ def download_cffex_history_data(month_required: dt.date, directory: Optional[Pat
         raise ValueError(f'The data your required is not existed.')
 
     # Handle <save_path>.
-    if directory is None:
-        directory = Path(CONFIGS['path']['download'])
-
-    # Make sure <save_path> is a directory.
-    make_directory_existed(directory)
+    download_path: Path = Path(CONFIGS['path']['download'])
+    make_directory_existed(download_path)
 
     # Do download.
     response = requests.get(url.format(year=year, month=month))
@@ -50,5 +45,5 @@ def download_cffex_history_data(month_required: dt.date, directory: Optional[Pat
         )
 
     # Write to file.
-    with open(directory.joinpath(f'CFFEX_{year:4d}-{month:02d}.zip'), 'wb') as f:
+    with open(download_path.joinpath(f'CFFEX_{year:4d}-{month:02d}.zip'), 'wb') as f:
         f.write(response.content)

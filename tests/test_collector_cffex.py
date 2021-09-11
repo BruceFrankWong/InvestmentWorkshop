@@ -63,16 +63,8 @@ def test_download_cffex_history_data(download_path, download_date):
         download_file.unlink()
     assert download_file.exists() is False
 
-    download_cffex_history_data(download_date, download_path)
-    assert download_file.exists() is True
-
-    # Test for <directory> is None.
-    download_file = download_path.joinpath(f'CFFEX_{year:4d}-{month:02d}.zip')
-    if download_file.exists():
-        download_file.unlink()
-    assert download_file.exists() is False
     download_cffex_history_data(download_date)
-    assert download_file.exists()
+    assert download_file.exists() is True
 
     # Test for impossible date.
     with pytest.raises(ValueError):
