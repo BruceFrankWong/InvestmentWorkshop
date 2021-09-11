@@ -14,10 +14,9 @@ from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.shfe import (
     download_shfe_history_data,
     download_shfe_history_data_all,
-    make_directory_existed,
-    unzip_quote_file,
     read_shfe_history_data,
 )
+from InvestmentWorkshop.collector.utility import unzip_quote_file
 
 
 @pytest.fixture()
@@ -110,69 +109,6 @@ def test_download_shfe_history_data_all(download_path):
     # Restore.
     for backup_file in backup_file_list:
         backup_file.rename(download_path.joinpath(backup_file.stem))
-
-
-def test_make_directory_existed():
-    """
-    Test for <InvestmentWorkshop.collector.shfe.make_directory_existed>.
-
-    :return: None.
-    """
-    test_path: Path = Path('E:\\a_temporary_test_path')
-    if test_path.exists():
-        test_path.rmdir()
-    assert test_path.exists() is False
-
-    make_directory_existed(test_path)
-    assert test_path.exists() is True
-
-    test_path.rmdir()
-    assert test_path.exists() is False
-
-
-def test_unzip_quote_file(download_path, download_year):
-    """
-    Test for <InvestmentWorkshop.collector.shfe.unzip_quote_file>.
-
-    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
-    :param download_year: Test fixture. A random year to download, int.
-    :return:
-    """
-
-    # Fill the variables.
-    unzip_directory: Path = download_path.joinpath('unzip')
-    download_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip')
-    backup_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip.backup')
-
-    # Make sure <download_file> does not exist.
-    if download_file.exists():
-        download_file.rename(backup_file)
-    assert download_file.exists() is False
-
-    # make sure <unzip_directory> existed and empty.
-    if unzip_directory.exists():
-        [x.unlink() for x in unzip_directory.iterdir()]
-    else:
-        unzip_directory.mkdir()
-    assert unzip_directory.exists() is True
-
-    # Download from SHFE.
-    download_shfe_history_data(download_year)
-    assert download_file.exists() is True
-
-    # Unzip
-    file_list = unzip_quote_file(download_file)
-
-    # Test.
-    for file in file_list:
-        assert file.exists() is True
-
-    # Make clean up.
-    for file in file_list:
-        file.unlink()
-        assert file.exists() is False
-    download_file.unlink()
-    assert download_file.exists() is False
 
 
 def test_read_shfe_history_data(download_path, download_year):
