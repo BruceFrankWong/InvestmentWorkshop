@@ -11,9 +11,11 @@ import datetime as dt
 import random
 
 from InvestmentWorkshop.utility import CONFIGS
+from InvestmentWorkshop.collector.utility import unzip_quote_file
 from InvestmentWorkshop.collector.cffex import (
     download_cffex_history_data,
     download_cffex_history_data_all,
+    read_cffex_history_data,
 )
 
 
@@ -122,3 +124,55 @@ def test_download_cffex_history_data_all():
         print(download_file)
         download_file.unlink()
         assert download_file.exists() is False
+
+
+def test_read_cffex_history_data(download_date, download_path):
+    """
+    Test for <read_cffex_history_data>.
+    :return:
+    """
+    # Generate a random CFFEX history data file.
+    year: int = download_date.year
+    month: int = download_date.month
+
+    # Assert <download_file> not existed.
+    download_file: Path = download_path.joinpath(f'CFFEX_{year:4d}-{month:02d}.zip')
+    assert download_file.exists() is False
+
+    # Download.
+    download_cffex_history_data(download_date)
+
+    # Assert <download_file> existed.
+    assert download_file.exists() is True
+
+    # Unzip <download_file>.
+    unzip_file_list: List[Path] = list(unzip_quote_file(download_file))
+    csv_file: Path
+    for csv_file in unzip_file_list:
+        assert csv_file.exists() is True
+
+        result = read_cffex_history_data(csv_file)
+        assert isinstance(result, list)
+        for item in result:
+            assert isinstance(item, dict)
+            assert isinstance(item['symbol'], str)
+            assert isinstance(item['date'], dt.date)
+            assert isinstance(item['previous_settlement'], float)
+            assert isinstance(item['open'], float)
+            assert isinstance(item['high'], float)
+            assert isinstance(item['low'], float)
+            assert isinstance(item['close'], float)
+            assert isinstance(item['settlement'], float)
+            assert isinstance(item['change_on_close'], float)
+            assert isinstance(item['change_on_settlement'], float)
+            assert isinstance(item['volume'], int)
+            assert isinstance(item['amount'], float)
+            assert isinstance(item['open_interest'], int)
+            assert isinstance(item['change_on_open_interest'], int)
+
+    # make clean.
+    for csv_file in unzip_file_list:
+        csv_file.unlink()
+        assert csv_file.exists() is False
+    download_file.unlink()
+    assert download_file.exists() is False

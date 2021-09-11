@@ -3,9 +3,10 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List
+from typing import List, Dict, Any
 from pathlib import Path
 import datetime as dt
+import csv
 
 import requests
 
@@ -69,3 +70,51 @@ def download_cffex_history_data_all() -> None:
             require_list.append(dt.date(year=year, month=month, day=1))
     for item in require_list:
         download_cffex_history_data(item)
+
+
+def read_cffex_history_data(csv_file: Path) -> List[Dict[str, Any]]:
+    """
+    Read quote data from file (csv).
+    :param csv_file:
+    :return:
+    """
+    result: List[Dict[str, Any]] = []
+
+    # Handle date.
+    filename: str = csv_file.name[:8]
+    date: dt.date = dt.date(
+        year=int(filename[:4]),
+        month=int(filename[4:6]),
+        day=int(filename[6:8])
+    )
+
+    # Read .csv files.
+    with open(csv_file, mode='r', encoding='gbk') as csv_file:
+        reader = csv.DictReader(csv_file)
+        for row in reader:
+            if row['合约代码'] == '小计' or row['合约代码'] == '合计' or '-' in row['合约代码']:
+                continue
+            try:
+                result.append(
+                    {
+                        'date': date,
+                        'symbol': row['合约代码'].strip(),
+                        'open': float(row['今开盘']) if len(row['今开盘']) > 0 else 0.0,
+                        'high': float(row['最高价']) if len(row['最高价']) > 0 else 0.0,
+                        'low': float(row['最低价']) if len(row['最低价']) > 0 else 0.0,
+                        'close': float(row['今收盘']) if len(row['今收盘']) > 0 else 0.0,
+                        'settlement': float(row['今结算']),
+                        'previous_settlement': float(row['前结算']),
+                        'volume': int(row['成交量']) if len(row['成交量']) > 0 else 0,
+                        'amount': float(row['成交金额']) if len(row['成交金额']) > 0 else 0.0,
+                        'open_interest': int(float(row['持仓量'])),
+                        'change_on_close': float(row['涨跌1']),
+                        'change_on_settlement': float(row['涨跌2']),
+                        'change_on_open_interest': int(float(row['持仓变化'])),
+                    }
+                )
+            except ValueError as e:
+                print(f'ERROR: in file {csv_file}.')
+                print(f'Content: \n\t{row}.')
+                print(e)
+    return result
