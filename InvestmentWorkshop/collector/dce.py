@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import datetime as dt
 from pathlib import Path
 
@@ -76,6 +76,31 @@ def download_dce_history_data_all() -> None:
     this_year: int = dt.date.today().year
     for year in range(start_year, this_year):
         download_dce_history_data(year)
+
+
+def correct_extension_name(file_path: Path) -> Optional[Path]:
+    """
+    Correct the extension name of some .csv file.
+    :param file_path: a Path-like object.
+    :return: Path-like object if corrected, else None.
+    """
+    if file_path.suffix == '.csv':
+        directory: Path = file_path.parent
+        stem: str = file_path.stem
+        new_path: Path
+        with open(file=file_path, mode='rb') as csv_file:
+            header = csv_file.read(4)
+        # .xlsx
+        if header == b'\x50\x4B\x03\x04':
+            new_path = directory.joinpath(f'{stem}.xlsx')
+            file_path.rename(new_path)
+            return new_path
+        # .xls
+        if header == b'\x3C\x3F\x78\x6D':
+            new_path = directory.joinpath(f'{stem}.xls')
+            file_path.rename(new_path)
+            return new_path
+    return None
 
 
 def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
