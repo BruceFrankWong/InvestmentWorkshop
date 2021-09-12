@@ -15,7 +15,7 @@ from InvestmentWorkshop.collector.dce import (
     fetch_dce_history_index,
     download_dce_history_data,
     download_dce_history_data_all,
-    correct_extension_name,
+    correct_format,
 )
 
 
@@ -139,7 +139,7 @@ def test_download_dce_history_data_all(download_path, start_year, this_year):
         assert download_file.exists() is False
 
 
-def test_correct_extension_name(download_path, start_year, this_year):
+def test_correct_format(download_path, start_year, this_year):
     # Generate download list.
     download_file_list: List[Path] = generate_download_list(download_path, start_year, this_year)
 
@@ -154,16 +154,17 @@ def test_correct_extension_name(download_path, start_year, this_year):
 
     # Correct
     for file in download_file_list:
-        result = correct_extension_name(file)
-        if result is not None:
-            with open(file=result, mode='rb') as f:
+        if file.suffix == '.csv':
+            with open(file=file, mode='rb') as f:
                 header = f.read(4)
-                if result.suffix == '.xls':
-                    assert header == b'\x3C\x3F\x78\x6D'
-                if result.suffix == '.xlsx':
-                    assert header == b'\x50\x4B\x03\x04'
-            result.unlink()
-            assert result.exists() is False
-        else:
-            file.unlink()
-            assert file.exists() is False
+            result = correct_format(file)
+            if result == '.xls':
+                assert header == b'\x3C\x3F\x78\x6D'
+            elif result == '.xlsx':
+                assert header == b'\x50\x4B\x03\x04'
+            elif result == '.csv':
+                assert (header != b'\x3C\x3F\x78\x6D') and (header != b'\x50\x4B\x03\x04')
+            else:
+                raise 'Error!'
+        file.unlink()
+        assert file.exists() is False

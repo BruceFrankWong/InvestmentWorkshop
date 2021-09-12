@@ -79,29 +79,22 @@ def download_dce_history_data_all() -> None:
         download_dce_history_data(year)
 
 
-def correct_extension_name(file_path: Path) -> Optional[Path]:
+def correct_format(file_path: Path) -> str:
     """
-    Correct the extension name of some .csv file.
+    Return the correct file format.
     :param file_path: a Path-like object.
-    :return: Path-like object if corrected, else None.
+    :return: str.
     """
     if file_path.suffix == '.csv':
-        directory: Path = file_path.parent
-        stem: str = file_path.stem
-        new_path: Path
         with open(file=file_path, mode='rb') as csv_file:
             header = csv_file.read(4)
         # .xlsx
         if header == b'\x50\x4B\x03\x04':
-            new_path = directory.joinpath(f'{stem}.xlsx')
-            file_path.rename(new_path)
-            return new_path
+            return '.xlsx'
         # .xls
         if header == b'\x3C\x3F\x78\x6D':
-            new_path = directory.joinpath(f'{stem}.xls')
-            file_path.rename(new_path)
-            return new_path
-    return None
+            return '.xls'
+    return '.csv'
 
 
 def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
