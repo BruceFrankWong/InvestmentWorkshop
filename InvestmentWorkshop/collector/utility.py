@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Generator
+from typing import List
 from pathlib import Path
 import zipfile
 
@@ -18,12 +18,13 @@ def make_directory_existed(directory: Path) -> None:
         directory.mkdir()
 
 
-def unzip_quote_file(quote_zip: Path) -> Generator[Path, None, None]:
+def unzip_quote_file(quote_zip: Path) -> List[Path]:
     """
     Unzip a zip file to a directory, and return the unzipped file path.
     :param quote_zip:
     :return: a generator.
     """
+    result: List[Path] = []
     if not quote_zip.exists():
         raise FileNotFoundError('<f> not found.')
 
@@ -35,11 +36,12 @@ def unzip_quote_file(quote_zip: Path) -> Generator[Path, None, None]:
     zip_file.extractall(unzip_directory)
 
     # Change names with corrected coding.
+    unzip_file: Path
+    correct_filename: Path
     for filename in zip_file.namelist():
         unzip_file = unzip_directory.joinpath(filename)
-        coding_correct = filename.encode('CP437').decode('GBK')
-        unzip_file.rename(
-            unzip_directory.joinpath(coding_correct)
-        )
+        correct_filename = unzip_directory.joinpath(filename.encode('CP437').decode('GBK'))
+        unzip_file.rename(correct_filename)
+        result.append(correct_filename)
 
-    return unzip_directory.iterdir()
+    return result
