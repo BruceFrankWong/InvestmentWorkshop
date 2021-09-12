@@ -11,11 +11,13 @@ import datetime as dt
 import random
 
 from InvestmentWorkshop.utility import CONFIGS
+from InvestmentWorkshop.collector.utility import unzip_quote_file
 from InvestmentWorkshop.collector.dce import (
     fetch_dce_history_index,
     download_dce_history_data,
     download_dce_history_data_all,
     correct_format,
+    read_dce_history_data,
 )
 
 
@@ -173,3 +175,73 @@ def test_correct_format(download_path, start_year, this_year):
                 raise 'Error!'
         file.unlink()
         assert file.exists() is False
+
+
+def test_read_dce_history_data(download_path, start_year, this_year):
+    # Generate download list.
+    download_file_list: List[Path] = _download_list_fully(download_path, start_year, this_year)
+
+    # Make sure files in <download_file_list> not existed.
+    for download_file in download_file_list:
+        if download_file.exists():
+            download_file.unlink()
+        assert download_file.exists() is False
+
+    # Download all data.
+    download_dce_history_data_all()
+
+    # Get zip file list and test file list.
+    test_file_list: List[Path] = []
+    zip_list: List[Path] = []
+    for download_file in download_file_list:
+        if download_file.suffix == '.zip':
+            zip_list.append(download_file)
+        else:
+            test_file_list.append(download_file)
+
+    # Unzip (and rename the last unzipped file to void name repeat error).
+    unzipped_file_list: List[Path] = []
+    for zip_file in zip_list:
+        year: str = zip_file.stem.split('_')[-1]
+        for unzipped_file in unzip_quote_file(zip_file):
+            new_file_path: Path = download_path.joinpath(
+                'unzip',
+                f'{unzipped_file.stem}_{year}{unzipped_file.suffix}'
+            )
+            unzipped_file.rename(new_file_path)
+            unzipped_file_list.append(new_file_path)
+        zip_file.unlink()
+        assert zip_file.exists() is False
+
+    # Union file lists.
+    test_file_list.extend(unzipped_file_list)
+
+    for test_file in test_file_list:
+        if '期权' not in test_file.stem:
+            try:
+                result = read_dce_history_data(test_file)
+                assert isinstance(result, list)
+                for item in result:
+                    assert isinstance(item, dict)
+                    assert isinstance(item['symbol'], str)
+                    assert isinstance(item['date'], dt.date)
+                    assert isinstance(item['previous_close'], float)
+                    assert isinstance(item['previous_settlement'], float)
+                    if item['open'] is not None:
+                        assert isinstance(item['open'], float)
+                    if item['high'] is not None:
+                        assert isinstance(item['high'], float)
+                    if item['low'] is not None:
+                        assert isinstance(item['low'], float)
+                    assert isinstance(item['close'], float)
+                    assert isinstance(item['settlement'], float)
+                    assert isinstance(item['change_on_close'], float)
+                    assert isinstance(item['change_on_settlement'], float)
+                    assert isinstance(item['volume'], int)
+                    assert isinstance(item['amount'], float)
+                    assert isinstance(item['open_interest'], int)
+            except RuntimeError:
+                print(f'Error in {test_file}.')
+
+        test_file.unlink()
+        assert test_file.exists() is False

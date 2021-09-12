@@ -125,7 +125,9 @@ def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
     row_max: int
     column_max, row_max = coordinate_from_string(worksheet.dimensions.split(':')[1])
     for row in range(2, row_max):
-        day: str = worksheet[f'D{row}'].value
+        day: str = str(worksheet[f'D{row}'].value)
+        if day is None:
+            break
         price_open: float = float(worksheet[f'G{row}'].value)
         price_high: float = float(worksheet[f'H{row}'].value)
         price_low: float = float(worksheet[f'I{row}'].value)
@@ -183,3 +185,19 @@ def read_dce_history_data_csv(csv_file: Path) -> List[Dict[str, Any]]:
                 }
             )
     return result
+
+
+def read_dce_history_data(data_file: Path) -> List[Dict[str, Any]]:
+    assert data_file.exists() is True
+    extension: str = data_file.suffix
+    if extension == '.csv':
+        if correct_format(data_file) == 'csv':
+            return read_dce_history_data_csv(data_file)
+        elif correct_format(data_file) == 'xlsx':
+            return read_dce_history_data_xlsx(data_file)
+        else:
+            raise RuntimeError(f'Unknown file type. {data_file}')
+    elif extension == '.xlsx':
+        return read_dce_history_data_xlsx(data_file)
+    else:
+        raise RuntimeError(f'Unknown file type. {data_file}')
