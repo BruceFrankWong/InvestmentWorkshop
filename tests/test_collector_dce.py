@@ -14,7 +14,7 @@ from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.dce import (
     fetch_dce_history_index,
     download_dce_history_data,
-    read_dce_history_data,
+    download_dce_history_data_all,
 )
 
 
@@ -79,47 +79,39 @@ def test_download_dce_history_data(download_path, download_year):
     for download_file in download_file_list:
         assert download_file.exists() is True
         download_file.unlink()
-        assert  download_file.exists() is False
+        assert download_file.exists() is False
 
 
-def test_read_dce_history_data(download_path, download_year):
+def test_download_dce_history_data_all(download_path):
+    # Generate download list.
     dce_data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
-    download_filename_pattern: str = 'DCE_{product}_{year}.xlsx'
-    download_file_list: List[Path] = [
-        download_path.joinpath(
-            download_filename_pattern.format(product=product, year=download_year)
-        ) for product in dce_data_index[download_year].keys()
-    ]
+    download_filename_pattern: str = 'DCE_{product}_{year}.{extension_name}'
+    download_file_list: List[Path] = []
+    start_year: int = 2006
+    this_year: int = dt.date.today().year
+    for year in range(start_year, this_year):
+        for product in dce_data_index[year].keys():
+            download_file_list.append(
+                download_path.joinpath(
+                    download_filename_pattern.format(
+                        product=product,
+                        year=year,
+                        extension_name=dce_data_index[year][product].split('.')[-1]
+                    )
+                )
+            )
 
-    # Make sure <download_file_list> not existed.
+    # Make sure files in <download_file_list> not existed.
     for download_file in download_file_list:
         if download_file.exists():
             download_file.unlink()
         assert download_file.exists() is False
 
     # Download.
-    download_dce_history_data(download_year)
+    download_dce_history_data_all()
 
     # Test and make clean.
     for download_file in download_file_list:
         assert download_file.exists() is True
-        result = read_dce_history_data(download_file)
-        assert isinstance(result, list)
-        for item in result:
-            assert isinstance(item, dict)
-            assert isinstance(item['symbol'], str)
-            assert isinstance(item['date'], dt.date)
-            assert isinstance(item['previous_settlement'], float)
-            assert isinstance(item['open'], float)
-            assert isinstance(item['high'], float)
-            assert isinstance(item['low'], float)
-            assert isinstance(item['close'], float)
-            assert isinstance(item['settlement'], float)
-            assert isinstance(item['change_on_close'], float)
-            assert isinstance(item['change_on_settlement'], float)
-            assert isinstance(item['volume'], int)
-            assert isinstance(item['amount'], float)
-            assert isinstance(item['open_interest'], int)
-            assert isinstance(item['change_on_open_interest'], int)
         download_file.unlink()
         assert download_file.exists() is False

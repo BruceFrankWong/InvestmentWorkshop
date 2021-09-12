@@ -71,6 +71,13 @@ def download_dce_history_data(year: int) -> None:
             f.write(response.content)
 
 
+def download_dce_history_data_all() -> None:
+    start_year: int = 2006
+    this_year: int = dt.date.today().year
+    for year in range(start_year, this_year):
+        download_dce_history_data(year)
+
+
 def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
     """
     Read quote data from .xlsx file.
@@ -131,15 +138,3 @@ def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
 def read_dce_history_data_csv():
     pass
 
-
-def read_dce_history_data(data_file: Path):
-    file_list: List[Path]
-    if data_file.suffix == '.zip':
-        file_list = list(unzip_quote_file(data_file))
-    elif data_file.suffix in ['.csv', '.xls', '.xlsx']:
-        file_list = [data_file]
-    else:
-        raise ValueError(f'Unknown extension name.')
-
-    for file in file_list:
-        print(file)
