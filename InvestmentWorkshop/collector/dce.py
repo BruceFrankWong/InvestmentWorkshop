@@ -6,6 +6,7 @@ __author__ = 'Bruce Frank Wong'
 from typing import Dict, List, Any, Optional
 import datetime as dt
 from pathlib import Path
+import csv
 
 import requests
 from lxml import etree
@@ -160,6 +161,32 @@ def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
     return result
 
 
-def read_dce_history_data_csv():
-    pass
-
+def read_dce_history_data_csv(csv_file: Path) -> List[Dict[str, Any]]:
+    assert csv_file.exists() is True
+    result: List[Dict[str, Any]] = []
+    with open(csv_file, mode='r', encoding='gbk') as csv_file:
+        reader = csv.DictReader(csv_file)
+        for row in reader:
+            result.append(
+                {
+                    'date': dt.date(
+                        year=int(row['日期'][:4]),
+                        month=int(row['日期'][4:6]),
+                        day=int(row['日期'][6:8])
+                    ),
+                    'symbol': row['合约'].strip(),
+                    'open': None if row['开盘价'] == '0' else float(row['开盘价']),
+                    'high': None if row['最高价'] == '0' else float(row['最高价']),
+                    'low': None if row['最低价'] == '0' else float(row['最低价']),
+                    'close': float(row['收盘价']),
+                    'settlement': float(row['结算价']),
+                    'previous_close': float(row['前收盘价']),
+                    'previous_settlement': float(row['前结算价']),
+                    'volume': int(row['成交量']),
+                    'amount': float(row['成交金额']),
+                    'open_interest': int(float(row['持仓量'])),
+                    'change_on_close': float(row['涨跌1']),
+                    'change_on_settlement': float(row['涨跌2']),
+                }
+            )
+    return result
