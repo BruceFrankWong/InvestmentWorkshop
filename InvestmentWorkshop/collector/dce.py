@@ -53,8 +53,10 @@ def fetch_dce_history_index() -> Dict[int, Dict[str, str]]:
 def download_dce_history_data(year: int) -> None:
     data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
     download_path: Path = Path(CONFIGS['path']['download'])
+    extension_name: str
     for product, url in data_index[year].items():
-        download_file = download_path.joinpath(f'DCE_{product}_{year}.xlsx')
+        extension_name = url.split('.')[-1]
+        download_file = download_path.joinpath(f'DCE_{product}_{year}.{extension_name}')
         response = requests.get(url)
         if response.status_code != 200:
             raise requests.exceptions.HTTPError(

@@ -54,10 +54,14 @@ def test_fetch_dce_history_index():
 
 def test_download_dce_history_data(download_path, download_year):
     dce_data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
-    download_filename_pattern: str = 'DCE_{product}_{year}.xlsx'
+    download_filename_pattern: str = 'DCE_{product}_{year}.{extension_name}'
     download_file_list: List[Path] = [
         download_path.joinpath(
-            download_filename_pattern.format(product=product, year=download_year)
+            download_filename_pattern.format(
+                product=product,
+                year=download_year,
+                extension_name=dce_data_index[download_year][product].split('.')[-1]
+            )
         ) for product in dce_data_index[download_year].keys()
     ]
 
