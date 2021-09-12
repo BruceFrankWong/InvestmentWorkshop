@@ -59,6 +59,38 @@ def download_year(start_year, this_year) -> int:
     return random.randint(start_year, this_year - 1)
 
 
+def _download_list_yearly(download_path: Path, download_year: int) -> List[Path]:
+    """
+    Generate a yearly download list.
+    :return: List[Path].
+    """
+    result: List[Path] = []
+    dce_data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
+    download_filename_pattern: str = 'DCE_{product}_{year}.{extension_name}'
+    for product in dce_data_index[download_year].keys():
+        result.append(
+            download_path.joinpath(
+                download_filename_pattern.format(
+                    product=product,
+                    year=download_year,
+                    extension_name=dce_data_index[download_year][product].split('.')[-1]
+                )
+            )
+        )
+    return result
+
+
+def _download_list_fully(download_path: Path, start_year: int, this_year: int) -> List[Path]:
+    """
+    Generate a fully download list.
+    :return: List[Path].
+    """
+    result: List[Path] = []
+    for year in range(start_year, this_year):
+        result.extend(_download_list_yearly(download_path, year))
+    return result
+
+
 def test_fetch_dce_history_index():
     result = fetch_dce_history_index()
     assert isinstance(result, dict)
@@ -73,17 +105,8 @@ def test_fetch_dce_history_index():
 
 
 def test_download_dce_history_data(download_path, download_year):
-    dce_data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
-    download_filename_pattern: str = 'DCE_{product}_{year}.{extension_name}'
-    download_file_list: List[Path] = [
-        download_path.joinpath(
-            download_filename_pattern.format(
-                product=product,
-                year=download_year,
-                extension_name=dce_data_index[download_year][product].split('.')[-1]
-            )
-        ) for product in dce_data_index[download_year].keys()
-    ]
+    # Generate download list.
+    download_file_list: List[Path] = _download_list_yearly(download_path, download_year)
 
     # Make sure <download_file_list> not existed.
     for download_file in download_file_list:
@@ -101,27 +124,9 @@ def test_download_dce_history_data(download_path, download_year):
         assert download_file.exists() is False
 
 
-def generate_download_list(download_path: Path, start_year: int, this_year: int) -> List[Path]:
-    result: List[Path] = []
-    dce_data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
-    download_filename_pattern: str = 'DCE_{product}_{year}.{extension_name}'
-    for year in range(start_year, this_year):
-        for product in dce_data_index[year].keys():
-            result.append(
-                download_path.joinpath(
-                    download_filename_pattern.format(
-                        product=product,
-                        year=year,
-                        extension_name=dce_data_index[year][product].split('.')[-1]
-                    )
-                )
-            )
-    return result
-
-
 def test_download_dce_history_data_all(download_path, start_year, this_year):
     # Generate download list.
-    download_file_list: List[Path] = generate_download_list(download_path, start_year, this_year)
+    download_file_list: List[Path] = _download_list_fully(download_path, start_year, this_year)
 
     # Make sure files in <download_file_list> not existed.
     for download_file in download_file_list:
@@ -141,7 +146,7 @@ def test_download_dce_history_data_all(download_path, start_year, this_year):
 
 def test_correct_format(download_path, start_year, this_year):
     # Generate download list.
-    download_file_list: List[Path] = generate_download_list(download_path, start_year, this_year)
+    download_file_list: List[Path] = _download_list_fully(download_path, start_year, this_year)
 
     # Make sure files in <download_file_list> not existed.
     for download_file in download_file_list:
