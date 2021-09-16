@@ -10,6 +10,7 @@ import csv
 
 import requests
 from lxml import etree
+import xlrd
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.worksheet.dimensions import SheetDimension
@@ -19,12 +20,34 @@ from ..utility import CONFIGS
 from .utility import unzip_quote_file
 
 
-def fetch_dce_history_index() -> Dict[int, Dict[str, str]]:
+DCE_History_URL_Index = Dict[int, Dict[str, str]]
+
+"""
+DCE_History_Quote: a list object, each item is a dict, and the keys is:
+    'symbol',
+    'date',
+    'previous_close',
+    'previous_settlement',
+    'open',
+    'high',
+    'low',
+    'close',
+    'settlement',
+    'change_on_close',
+    'change_on_settlement',
+    'volume',
+    'amount',
+    'open_interest',
+"""
+DCE_History_Quote = List[Dict[str, Any]]
+
+
+def fetch_dce_history_index() -> DCE_History_URL_Index:
     """
     Download history data (monthly) from DCE.
     :return: Dict[int, Dict[str, str]].
     """
-    result: Dict[int, Dict[str, str]] = {}
+    result: DCE_History_URL_Index = {}
     url_dce: str = 'http://www.dce.com.cn'
     url: str = f'{url_dce}/dalianshangpin/xqsj/lssj/index.html'
 
@@ -57,7 +80,7 @@ def fetch_dce_history_index() -> Dict[int, Dict[str, str]]:
 
 
 def download_dce_history_data(year: int) -> None:
-    data_index: Dict[int, Dict[str, str]] = fetch_dce_history_index()
+    data_index: DCE_History_URL_Index = fetch_dce_history_index()
     download_path: Path = Path(CONFIGS['path']['download'])
     extension_name: str
     for product, url in data_index[year].items():
@@ -97,27 +120,106 @@ def correct_format(file_path: Path) -> str:
     return '.csv'
 
 
-def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
+def read_dce_history_data_xls(xls_file: Path) -> DCE_History_Quote:
+    """
+    Read quote data from .xls file.
+    :param xls_file: a Path-like object.
+    :return: DCE_History_Quote.
+    """
+    assert xls_file.exists() is True
+
+    result: DCE_History_Quote = []
+
+    # Read .xls files.
+    workbook = xlrd.open_workbook(xls_file)
+    for data_sheet in workbook.sheets():
+        print(data_sheet.nrows)
+
+        # Columns.
+        xls_column_list: List[str] = [x.value for x in data_sheet.row(0)]
+        mapper = Dict[str, int]
+        if '期权' in xls_file.stem:
+            mapper = {
+                'symbol': xls_column_list.index('合约名称'),
+                'date': xls_column_list.index('交易日期'),
+                'open': xls_column_list.index('开盘价'),
+                'high': xls_column_list.index('最高价'),
+                'low': xls_column_list.index('最低价'),
+                'close': xls_column_list.index('收盘价'),
+                'previous_settlement': xls_column_list.index('前结算价'),
+                'settlement': xls_column_list.index('结算价'),
+                'change_on_close': xls_column_list.index('涨跌'),
+                'change_on_settlement': xls_column_list.index('涨跌1'),
+                'delta': xls_column_list.index('DELTA'),
+                'volume': xls_column_list.index('成交量'),
+                'open_interest': xls_column_list.index('持仓量'),
+                'change_on_open_interest': xls_column_list.index('持仓量变化'),
+                'amount': xls_column_list.index('成交额（万元）'),
+                'exercise': xls_column_list.index('行权量'),
+            }
+        else:
+            mapper = {
+                'symbol': xls_column_list.index('合约'),
+                'date': xls_column_list.index('日期'),
+                'previous_close': xls_column_list.index('前收盘'),
+                'previous_settlement': xls_column_list.index('前结算'),
+                'open': xls_column_list.index('开盘价'),
+                'high': xls_column_list.index('最高价'),
+                'low': xls_column_list.index('最低价'),
+                'close': xls_column_list.index('收盘价'),
+                'settlement': xls_column_list.index('结算价'),
+                'change_on_close': xls_column_list.index('涨跌1'),
+                'change_on_settlement': xls_column_list.index('涨跌2'),
+                'volume': xls_column_list.index('成交量'),
+                'amount': xls_column_list.index('成交金额'),
+                'open_interest': xls_column_list.index('持仓量'),
+            }
+        for i in range(1, data_sheet.nrows):
+            row = data_sheet.row(i)
+            result.append(
+                {
+                    'symbol': row[mapper['symbol']].value,
+                    'date': dt.date(
+                        year=int(row[mapper['date']].value[:4]),
+                        month=int(row[mapper['date']].value[4:6]),
+                        day=int(row[mapper['date']].value[6:8])
+                    ),
+
+                    'previous_settlement': row[mapper['previous_settlement']].value
+                    if row[mapper['settlement']].ctype != 0 else None,
+
+                    'open': row[mapper['open']].value if row[mapper['open']].ctype != 0 else None,
+                    'high': row[mapper['high']].value if row[mapper['high']].ctype != 0 else None,
+                    'low': row[mapper['low']].value if row[mapper['low']].ctype != 0 else None,
+                    'close': row[mapper['close']].value if row[mapper['close']].ctype != 0 else None,
+                    'settlement': row[mapper['settlement']].value if row[mapper['settlement']].ctype != 0 else None,
+
+                    'change_on_close': row[mapper['change_on_close']].value
+                    if row[mapper['change_on_close']].ctype != 0 else None,
+                    'change_on_settlement': row[mapper['change_on_settlement']].value
+                    if row[mapper['change_on_settlement']].ctype != 0 else None,
+
+                    'volume': int(row[mapper['volume']].value)
+                    if row[mapper['volume']].ctype != 0 else None,
+
+                    'amount': row[mapper['amount']].value
+                    if row[mapper['amount']].ctype != 0 else None,
+
+                    'open_interest': int(row[mapper['open_interest']].value)
+                    if row[mapper['open_interest']].ctype != 0 else None,
+                }
+            )
+
+    return result
+
+
+def read_dce_history_data_xlsx(xlsx_file: Path) -> DCE_History_Quote:
     """
     Read quote data from .xlsx file.
     :param xlsx_file: a Path-like object.
-    :return: a list object, each item is a dict, and the keys is:
-        'symbol',
-        'date',
-        'previous_close',
-        'previous_settlement',
-        'open',
-        'high',
-        'low',
-        'close',
-        'settlement',
-        'change_on_close',
-        'change_on_settlement',
-        'volume',
-        'amount',
-        'open_interest',
+    :return: DCE_History_Quote.
     """
-    result: List[Dict[str, Any]] = []
+    result: DCE_History_Quote = []
     assert xlsx_file.exists() is True
     workbook: Workbook = load_workbook(filename=xlsx_file)
     worksheet: Worksheet = workbook.active
@@ -156,9 +258,9 @@ def read_dce_history_data_xlsx(xlsx_file: Path) -> List[Dict[str, Any]]:
     return result
 
 
-def read_dce_history_data_csv(csv_file: Path) -> List[Dict[str, Any]]:
+def read_dce_history_data_csv(csv_file: Path) -> DCE_History_Quote:
     assert csv_file.exists() is True
-    result: List[Dict[str, Any]] = []
+    result: DCE_History_Quote = []
     with open(csv_file, mode='r', encoding='gbk') as csv_file:
         reader = csv.DictReader(csv_file)
         for row in reader:
@@ -187,7 +289,7 @@ def read_dce_history_data_csv(csv_file: Path) -> List[Dict[str, Any]]:
     return result
 
 
-def read_dce_history_data(data_file: Path) -> List[Dict[str, Any]]:
+def read_dce_history_data(data_file: Path) -> DCE_History_Quote:
     assert data_file.exists() is True
     extension: str = data_file.suffix
     if extension == '.csv':
