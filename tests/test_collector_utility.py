@@ -77,7 +77,9 @@ def test_unzip_quote_file():
     file_list = unzip_quote_file(download_file)
 
     # Test.
+    assert isinstance(file_list, list)
     for file in file_list:
+        assert isinstance(file, Path)
         assert file.exists() is True
 
     # Make clean up.
