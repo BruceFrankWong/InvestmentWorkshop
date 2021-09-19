@@ -178,6 +178,13 @@ def test_correct_format(download_path, start_year, this_year):
 
 
 def test_read_dce_history_data(download_path, start_year, this_year):
+    """
+    A fully test.
+    :param download_path:
+    :param start_year:
+    :param this_year:
+    :return:
+    """
     # Generate download list.
     download_file_list: List[Path] = _download_list_fully(download_path, start_year, this_year)
 
@@ -189,6 +196,10 @@ def test_read_dce_history_data(download_path, start_year, this_year):
 
     # Download all data.
     download_dce_history_data_all()
+
+    # Test file existed.
+    for download_file in download_file_list:
+        assert download_file.exists() is True
 
     # Get zip file list and test file list.
     test_file_list: List[Path] = []
@@ -216,16 +227,66 @@ def test_read_dce_history_data(download_path, start_year, this_year):
     # Union file lists.
     test_file_list.extend(unzipped_file_list)
 
+    # Correct extension name.
+    corrected_test_file_list: List[Path] = []
     for test_file in test_file_list:
-        if '期权' not in test_file.stem:
+        if test_file.suffix == '.csv':
+            extension: str = correct_format(test_file)
+            if extension == '.xls' or extension == '.xlsx':
+                new_file_path = test_file.parent.joinpath(f'{test_file.stem}{extension}')
+                test_file.rename(new_file_path)
+                corrected_test_file_list.append(new_file_path)
+            else:
+                corrected_test_file_list.append(test_file)
+        else:
+            corrected_test_file_list.append(test_file)
+
+    # Test file existed.
+    for test_file in corrected_test_file_list:
+        assert test_file.exists() is True
+
+    # Do the test.
+    for test_file in corrected_test_file_list:
+        print(f'Test {test_file} ...')
+        result = read_dce_history_data(test_file)
+        assert isinstance(result, list)
+        if '期权' in test_file.stem:
             try:
-                result = read_dce_history_data(test_file)
-                assert isinstance(result, list)
                 for item in result:
                     assert isinstance(item, dict)
+                    assert len(item.keys()) == 16
                     assert isinstance(item['symbol'], str)
                     assert isinstance(item['date'], dt.date)
-                    assert isinstance(item['previous_close'], float)
+                    if item['open'] is not None:
+                        assert isinstance(item['open'], float)
+                    if item['high'] is not None:
+                        assert isinstance(item['high'], float)
+                    if item['low'] is not None:
+                        assert isinstance(item['low'], float)
+                    assert isinstance(item['close'], float)
+                    assert isinstance(item['previous_settlement'], float)
+                    assert isinstance(item['settlement'], float)
+                    assert isinstance(item['change_on_close'], float)
+                    assert isinstance(item['change_on_settlement'], float)
+                    if item['delta'] is not None:
+                        assert isinstance(item['delta'], float)
+                    assert isinstance(item['volume'], int)
+                    assert isinstance(item['open_interest'], int)
+                    assert isinstance(item['change_on_open_interest'], int)
+                    assert isinstance(item['amount'], float)
+                    assert isinstance(item['exercise'], int)
+
+            except RuntimeError as e:
+                print(f'Error in {test_file}, cause {e}')
+        else:
+            try:
+                for item in result:
+                    assert isinstance(item, dict)
+                    assert len(item.keys()) == 14
+                    assert isinstance(item['symbol'], str)
+                    assert isinstance(item['date'], dt.date)
+                    if item['previous_close'] is not None:
+                        assert isinstance(item['previous_close'], float)
                     assert isinstance(item['previous_settlement'], float)
                     if item['open'] is not None:
                         assert isinstance(item['open'], float)
@@ -240,8 +301,8 @@ def test_read_dce_history_data(download_path, start_year, this_year):
                     assert isinstance(item['volume'], int)
                     assert isinstance(item['amount'], float)
                     assert isinstance(item['open_interest'], int)
-            except RuntimeError:
-                print(f'Error in {test_file}.')
+            except RuntimeError as e:
+                print(f'Error in {test_file}, cause {e}.')
 
         test_file.unlink()
         assert test_file.exists() is False

@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import datetime as dt
 from pathlib import Path
 import csv
@@ -13,11 +13,9 @@ from lxml import etree
 import xlrd
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.worksheet.dimensions import SheetDimension
-from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
+from openpyxl.utils.cell import coordinate_from_string
 
 from ..utility import CONFIGS
-from .utility import unzip_quote_file
 
 
 DCE_History_URL_Index = Dict[int, Dict[str, str]]
@@ -120,172 +118,208 @@ def correct_format(file_path: Path) -> str:
     return '.csv'
 
 
-def read_dce_history_data_xls(xls_file: Path) -> DCE_History_Quote:
+def read_dce_history_data_xls(xls_path: Path) -> DCE_History_Quote:
     """
     Read quote data from .xls file.
-    :param xls_file: a Path-like object.
+    :param xls_path: a Path-like object.
     :return: DCE_History_Quote.
     """
-    assert xls_file.exists() is True
+    assert xls_path.exists() is True
+
+    # It seemed that only
+    assert '期权' in xls_path.stem
 
     result: DCE_History_Quote = []
 
     # Read .xls files.
-    workbook = xlrd.open_workbook(xls_file)
+    workbook = xlrd.open_workbook(xls_path)
     for data_sheet in workbook.sheets():
-        print(data_sheet.nrows)
 
         # Columns.
         xls_column_list: List[str] = [x.value for x in data_sheet.row(0)]
-        mapper = Dict[str, int]
-        if '期权' in xls_file.stem:
-            mapper = {
-                'symbol': xls_column_list.index('合约名称'),
-                'date': xls_column_list.index('交易日期'),
-                'open': xls_column_list.index('开盘价'),
-                'high': xls_column_list.index('最高价'),
-                'low': xls_column_list.index('最低价'),
-                'close': xls_column_list.index('收盘价'),
-                'previous_settlement': xls_column_list.index('前结算价'),
-                'settlement': xls_column_list.index('结算价'),
-                'change_on_close': xls_column_list.index('涨跌'),
-                'change_on_settlement': xls_column_list.index('涨跌1'),
-                'delta': xls_column_list.index('DELTA'),
-                'volume': xls_column_list.index('成交量'),
-                'open_interest': xls_column_list.index('持仓量'),
-                'change_on_open_interest': xls_column_list.index('持仓量变化'),
-                'amount': xls_column_list.index('成交额（万元）'),
-                'exercise': xls_column_list.index('行权量'),
-            }
-        else:
-            mapper = {
-                'symbol': xls_column_list.index('合约'),
-                'date': xls_column_list.index('日期'),
-                'previous_close': xls_column_list.index('前收盘'),
-                'previous_settlement': xls_column_list.index('前结算'),
-                'open': xls_column_list.index('开盘价'),
-                'high': xls_column_list.index('最高价'),
-                'low': xls_column_list.index('最低价'),
-                'close': xls_column_list.index('收盘价'),
-                'settlement': xls_column_list.index('结算价'),
-                'change_on_close': xls_column_list.index('涨跌1'),
-                'change_on_settlement': xls_column_list.index('涨跌2'),
-                'volume': xls_column_list.index('成交量'),
-                'amount': xls_column_list.index('成交金额'),
-                'open_interest': xls_column_list.index('持仓量'),
-            }
         for i in range(1, data_sheet.nrows):
             row = data_sheet.row(i)
+            date_str = row[xls_column_list.index('交易日期')].value
+            if date_str is None:
+                print(f'Error in {xls_path} at row {i}')
             result.append(
                 {
-                    'symbol': row[mapper['symbol']].value,
+                    'symbol': row[xls_column_list.index('合约名称')].value,
                     'date': dt.date(
-                        year=int(row[mapper['date']].value[:4]),
-                        month=int(row[mapper['date']].value[4:6]),
-                        day=int(row[mapper['date']].value[6:8])
+                        year=int(date_str[:4]),
+                        month=int(date_str[4:6]),
+                        day=int(date_str[6:8])
                     ),
-
-                    'previous_settlement': row[mapper['previous_settlement']].value
-                    if row[mapper['settlement']].ctype != 0 else None,
-
-                    'open': row[mapper['open']].value if row[mapper['open']].ctype != 0 else None,
-                    'high': row[mapper['high']].value if row[mapper['high']].ctype != 0 else None,
-                    'low': row[mapper['low']].value if row[mapper['low']].ctype != 0 else None,
-                    'close': row[mapper['close']].value if row[mapper['close']].ctype != 0 else None,
-                    'settlement': row[mapper['settlement']].value if row[mapper['settlement']].ctype != 0 else None,
-
-                    'change_on_close': row[mapper['change_on_close']].value
-                    if row[mapper['change_on_close']].ctype != 0 else None,
-                    'change_on_settlement': row[mapper['change_on_settlement']].value
-                    if row[mapper['change_on_settlement']].ctype != 0 else None,
-
-                    'volume': int(row[mapper['volume']].value)
-                    if row[mapper['volume']].ctype != 0 else None,
-
-                    'amount': row[mapper['amount']].value
-                    if row[mapper['amount']].ctype != 0 else None,
-
-                    'open_interest': int(row[mapper['open_interest']].value)
-                    if row[mapper['open_interest']].ctype != 0 else None,
+                    'open': float(row[xls_column_list.index('开盘价')].value),
+                    'high': float(row[xls_column_list.index('最高价')].value),
+                    'low': float(row[xls_column_list.index('最低价')].value),
+                    'close': float(row[xls_column_list.index('收盘价')].value),
+                    'previous_settlement': float(row[xls_column_list.index('前结算价')].value),
+                    'settlement': float(row[xls_column_list.index('结算价')].value),
+                    'change_on_close': float(row[xls_column_list.index('涨跌')].value),
+                    'change_on_settlement': float(row[xls_column_list.index('涨跌1')].value),
+                    'delta': float(row[xls_column_list.index('DELTA')].value)
+                    if row[xls_column_list.index('DELTA')].value != '' else None,
+                    'volume': int(row[xls_column_list.index('成交量')].value),
+                    'open_interest': int(row[xls_column_list.index('持仓量')].value),
+                    'change_on_open_interest': int(row[xls_column_list.index('持仓量变化')].value),
+                    'amount': float(row[xls_column_list.index('成交额（万元）')].value) * 10000,
+                    'exercise': int(row[xls_column_list.index('行权量')].value),
                 }
             )
 
     return result
 
 
-def read_dce_history_data_xlsx(xlsx_file: Path) -> DCE_History_Quote:
+def read_dce_history_data_xlsx(xlsx_path: Path) -> DCE_History_Quote:
     """
     Read quote data from .xlsx file.
-    :param xlsx_file: a Path-like object.
+    :param xlsx_path: a Path-like object.
     :return: DCE_History_Quote.
     """
     result: DCE_History_Quote = []
-    assert xlsx_file.exists() is True
-    workbook: Workbook = load_workbook(filename=xlsx_file)
+    assert xlsx_path.exists() is True
+    workbook: Workbook = load_workbook(filename=xlsx_path)
     worksheet: Worksheet = workbook.active
     column_max: str
     row_max: int
     column_max, row_max = coordinate_from_string(worksheet.dimensions.split(':')[1])
+    column_list: List[str] = [str(x.value).strip() for x in list(worksheet.rows)[0]]
     for row in range(2, row_max):
-        day: str = str(worksheet[f'D{row}'].value)
+        if '交易日期' in column_list:
+            day = worksheet.cell(row=row, column=column_list.index('交易日期') + 1).value
+        else:
+            day = worksheet.cell(row=row, column=column_list.index('日期') + 1).value
         if day is None:
             break
-        price_open: float = float(worksheet[f'G{row}'].value)
-        price_high: float = float(worksheet[f'H{row}'].value)
-        price_low: float = float(worksheet[f'I{row}'].value)
-        result.append(
-            {
-                'symbol': worksheet[f'C{row}'].value,
-                'date': dt.date(
-                    year=int(day[:4]),
-                    month=int(day[4:6]),
-                    day=int(day[6:8]),
-                ),
-                'previous_close': float(worksheet[f'E{row}'].value),
-                'previous_settlement': float(worksheet[f'F{row}'].value),
-                'open': price_open if price_open != 0.0 else None,
-                'high': price_high if price_high != 0.0 else None,
-                'low': price_low if price_low != 0.0 else None,
-                'close': float(worksheet[f'J{row}'].value),
-                'settlement': float(worksheet[f'K{row}'].value),
-                'change_on_close': float(worksheet[f'L{row}'].value),
-                'change_on_settlement': float(worksheet[f'M{row}'].value),
-                'volume': int(float(worksheet[f'N{row}'].value)),
-                'amount': float(worksheet[f'O{row}'].value),
-                'open_interest': int(float(worksheet[f'P{row}'].value)),
-            }
-        )
+        else:
+            day = dt.date(
+                year=int(str(day)[:4]),
+                month=int(str(day)[4:6]),
+                day=int(str(day)[6:8]),
+            )
+
+        symbol: str
+        if '合约名称' in column_list:
+            symbol = str(worksheet.cell(row=row, column=column_list.index('合约名称') + 1).value)
+        else:
+            symbol = str(worksheet.cell(row=row, column=column_list.index('合约') + 1).value)
+
+        price_open: Any = worksheet.cell(row=row, column=column_list.index('开盘价') + 1).value
+        price_high: Any = worksheet.cell(row=row, column=column_list.index('最高价') + 1).value
+        price_low: Any = worksheet.cell(row=row, column=column_list.index('最低价') + 1).value
+        price_close: float = float(worksheet.cell(row=row, column=column_list.index('收盘价')+1).value)
+        volume: int = int(float(worksheet.cell(row=row, column=column_list.index('成交量') + 1).value))
+
+        if '期权' in xlsx_path.stem:
+            result.append(
+                {
+                    'symbol': symbol,
+                    'date': day,
+                    'open': None if price_open is None or price_open == 0 or price_open == 0.0 else float(price_open),
+                    'high': None if price_high is None or price_high == 0 or price_high == 0.0 else float(price_high),
+                    'low': None if price_low is None or price_low == 0 or price_low == 0.0 else float(price_low),
+                    'close': price_close,
+                    'previous_settlement': float(worksheet.cell(row=row, column=column_list.index('前结算价')+1).value),
+                    'settlement': float(worksheet.cell(row=row, column=column_list.index('结算价')+1).value),
+                    'change_on_close': float(worksheet.cell(row=row, column=column_list.index('涨跌')+1).value),
+                    'change_on_settlement': float(worksheet.cell(row=row, column=column_list.index('涨跌1')+1).value),
+                    'delta': None
+                    if worksheet.cell(row=row, column=column_list.index('DELTA')+1).value is None or
+                    len(str(worksheet.cell(row=row, column=column_list.index('DELTA') + 1).value)) == 0
+                    else float(worksheet.cell(row=row, column=column_list.index('DELTA')+1).value),
+                    'volume': volume,
+                    'open_interest': int(worksheet.cell(row=row, column=column_list.index('持仓量')+1).value),
+                    'change_on_open_interest': int(
+                        worksheet.cell(row=row, column=column_list.index('持仓量变化')+1).value
+                    ),
+                    'amount': float(worksheet.cell(row=row, column=column_list.index('成交额（万元）')+1).value) * 10000,
+                    'exercise': int(float(worksheet.cell(row=row, column=column_list.index('行权量')+1).value)),
+                }
+            )
+        else:
+            if '成交金额' in column_list:
+                column_list[column_list.index('成交金额')] = '成交额'
+            result.append(
+                {
+                    'symbol': symbol,
+                    'date': day,
+                    'open': None if price_open is None or price_open == 0 or price_open == 0.0 else float(price_open),
+                    'high': None if price_high is None or price_high == 0 or price_high == 0.0 else float(price_high),
+                    'low': None if price_low is None or price_low == 0 or price_low == 0.0 else float(price_low),
+                    'close': price_close,
+
+                    'previous_close': float(worksheet.cell(row=row, column=column_list.index('前收盘价')+1).value),
+                    'previous_settlement': float(worksheet.cell(row=row, column=column_list.index('前结算价')+1).value),
+                    'settlement': float(worksheet.cell(row=row, column=column_list.index('结算价')+1).value),
+                    'change_on_close': float(worksheet.cell(row=row, column=column_list.index('涨跌1')+1).value),
+                    'change_on_settlement': float(worksheet.cell(row=row, column=column_list.index('涨跌2')+1).value),
+                    'volume': int(float(worksheet.cell(row=row, column=column_list.index('成交量')+1).value)),
+                    'amount': float(worksheet.cell(row=row, column=column_list.index('成交额')+1).value),
+                    'open_interest': int(float(worksheet.cell(row=row, column=column_list.index('持仓量')+1).value)),
+                }
+            )
+
     return result
 
 
-def read_dce_history_data_csv(csv_file: Path) -> DCE_History_Quote:
-    assert csv_file.exists() is True
+def read_dce_history_data_csv(csv_path: Path) -> DCE_History_Quote:
+    assert csv_path.exists() is True
     result: DCE_History_Quote = []
-    with open(csv_file, mode='r', encoding='gbk') as csv_file:
+    with open(csv_path, mode='r', encoding='gbk') as csv_file:
         reader = csv.DictReader(csv_file)
-        for row in reader:
-            result.append(
-                {
-                    'date': dt.date(
-                        year=int(row['日期'][:4]),
-                        month=int(row['日期'][4:6]),
-                        day=int(row['日期'][6:8])
-                    ),
-                    'symbol': row['合约'].strip(),
-                    'open': None if row['开盘价'] == '0' else float(row['开盘价']),
-                    'high': None if row['最高价'] == '0' else float(row['最高价']),
-                    'low': None if row['最低价'] == '0' else float(row['最低价']),
-                    'close': float(row['收盘价']),
-                    'settlement': float(row['结算价']),
-                    'previous_close': float(row['前收盘价']),
-                    'previous_settlement': float(row['前结算价']),
-                    'volume': int(row['成交量']),
-                    'amount': float(row['成交金额']),
-                    'open_interest': int(float(row['持仓量'])),
-                    'change_on_close': float(row['涨跌1']),
-                    'change_on_settlement': float(row['涨跌2']),
-                }
-            )
+        if '期权' in csv_path.stem:
+            for row in reader:
+                result.append(
+                    {
+                        'symbol': row['合约名称'].strip(),
+                        'date': dt.date(
+                            year=int(row['交易日期'][:4]),
+                            month=int(row['交易日期'][4:6]),
+                            day=int(row['交易日期'][6:8])
+                        ),
+                        'open': None if row['开盘价'] == '0' or row['开盘价'] == 0 else float(row['开盘价']),
+                        'high': None if row['最高价'] == '0' else float(row['最高价']),
+                        'low': None if row['最低价'] == '0' else float(row['最低价']),
+                        'close': float(row['收盘价']),
+                        'previous_settlement': float(row['前结算价']),
+                        'settlement': float(row['结算价']),
+                        'change_on_close': float(row['涨跌']),
+                        'change_on_settlement': float(row['涨跌1']),
+                        'delta': None if row['Delta'] == '' else float(row['Delta']),
+                        'volume': int(row['成交量']),
+                        'open_interest': int(float(row['持仓量'])),
+                        'change_on_open_interest': int(float(row['持仓量变化'])),
+                        'amount': float(row['成交额（万元）']) * 10000,
+                        'exercise': int(row['行权量']),
+                    }
+                )
+        else:
+            for row in reader:
+                result.append(
+                    {
+                        'symbol': row['合约'].strip(),
+                        'date': dt.date(
+                            year=int(row['日期'][:4]),
+                            month=int(row['日期'][4:6]),
+                            day=int(row['日期'][6:8])
+                        ),
+                        'previous_close': None
+                        if row['前收盘价'] == '0' or row['前收盘价'] == 0 or row['前收盘价'] == '' or row['前收盘价'] is None
+                        else float(row['前收盘价']),
+                        'previous_settlement': float(row['前结算价']),
+                        'open': None if row['开盘价'] == '0' or row['开盘价'] == 0 else float(row['开盘价']),
+                        'high': None if row['最高价'] == '0' else float(row['最高价']),
+                        'low': None if row['最低价'] == '0' else float(row['最低价']),
+                        'close': float(row['收盘价']),
+                        'settlement': float(row['结算价']),
+                        'change_on_close': float(row['涨跌1']),
+                        'change_on_settlement': float(row['涨跌2']),
+                        'volume': int(row['成交量']),
+                        'amount': float(row['成交金额']) * 10000,
+                        'open_interest': int(float(row['持仓量'])),
+                    }
+                )
     return result
 
 
@@ -293,12 +327,16 @@ def read_dce_history_data(data_file: Path) -> DCE_History_Quote:
     assert data_file.exists() is True
     extension: str = data_file.suffix
     if extension == '.csv':
-        if correct_format(data_file) == 'csv':
+        if correct_format(data_file) == '.csv':
             return read_dce_history_data_csv(data_file)
-        elif correct_format(data_file) == 'xlsx':
+        elif correct_format(data_file) == '.xls':
+            return read_dce_history_data_xls(data_file)
+        elif correct_format(data_file) == '.xlsx':
             return read_dce_history_data_xlsx(data_file)
         else:
             raise RuntimeError(f'Unknown file type. {data_file}')
+    elif extension == '.xls':
+        return read_dce_history_data_xls(data_file)
     elif extension == '.xlsx':
         return read_dce_history_data_xlsx(data_file)
     else:
