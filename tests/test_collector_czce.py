@@ -18,7 +18,8 @@ def test_fetch_czce_history_index():
     assert 'futures' in result.keys()
     assert 'option' in result.keys()
 
-    for k, v in result.items():
-        assert isinstance(v, list)
-        for item in v:
-            assert isinstance(item, str)
+    for k1, v1 in result.items():
+        assert isinstance(v1, dict)
+        for k2, v2 in v1.items():
+            assert isinstance(k2, int)
+            assert isinstance(v2, str)
