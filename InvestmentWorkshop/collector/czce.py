@@ -4,9 +4,16 @@ __author__ = 'Bruce Frank Wong'
 
 
 from typing import List, Dict
+from pathlib import Path
 
 import requests
 from lxml import etree
+
+from ..utility import CONFIGS
+from .utility import make_directory_existed
+
+
+CZCE_DATA_INDEX = Dict[str, Dict[int, str]]
 
 
 def fetch_czce_history_index() -> Dict[str, Dict[int, str]]:
@@ -43,3 +50,30 @@ def fetch_czce_history_index() -> Dict[str, Dict[int, str]]:
         else:
             result['futures'][year] = f'{url_czce}{url_list[i]}'
     return result
+
+
+def download_czce_history_data(year: int, type_: str = 'futures'):
+    # Parameters handle.
+    url_mapper: CZCE_DATA_INDEX = fetch_czce_history_index()
+    url_list: Dict[int, str]
+    if type_ == 'futures':
+        url_list = url_mapper['futures']
+    elif type_ == 'option':
+        url_list = url_mapper['option']
+    else:
+        raise ValueError('<type_> should be "Futures" or "Option".')
+
+    if year not in url_list.keys():
+        raise ValueError('<year> is beyond possible range.')
+
+    # Make sure <download_path> existed.
+    download_path: Path = Path(CONFIGS['path']['download'])
+    make_directory_existed(download_path)
+
+    # Download index page.
+    url: str = url_list[year]
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise requests.exceptions.HTTPError(f'Error in downloading <{url.format(year=year)}>.')
+    with open(download_path.joinpath(f'CZCE_{type_}_{year:4d}.zip'), 'wb') as f:
+        f.write(response.content)
