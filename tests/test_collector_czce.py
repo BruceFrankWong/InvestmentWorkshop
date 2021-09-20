@@ -14,6 +14,7 @@ from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.czce import (
     fetch_czce_history_index,
     download_czce_history_data,
+    download_czce_history_data_all,
 )
 
 
@@ -31,12 +32,21 @@ def download_path() -> Path:
 
 
 @pytest.fixture()
-def czce_start_year() -> int:
+def czce_start_year_futures() -> int:
     """
-    Year when CZCE history data begin.
+    Year when CZCE futures history data begin.
     :return: int.
     """
-    return 2006
+    return 2010
+
+
+@pytest.fixture()
+def czce_start_year_option() -> int:
+    """
+    Year when CZCE option history data begin.
+    :return: int.
+    """
+    return 2017
 
 
 @pytest.fixture()
@@ -49,12 +59,21 @@ def this_year() -> int:
 
 
 @pytest.fixture()
-def download_year(czce_start_year, this_year) -> int:
+def download_year_futures(czce_start_year_futures, this_year) -> int:
     """
     Generate a random year to download.
     :return: int.
     """
-    return random.randint(czce_start_year, this_year - 1)
+    return random.randint(czce_start_year_futures, this_year)
+
+
+@pytest.fixture()
+def download_year_option(czce_start_year_option, this_year) -> int:
+    """
+    Generate a random year to download.
+    :return: int.
+    """
+    return random.randint(czce_start_year_option, this_year)
 
 
 def test_fetch_czce_history_index():
@@ -72,9 +91,9 @@ def test_fetch_czce_history_index():
             assert isinstance(v2, str)
 
 
-def test_download_czce_history_data(download_path, download_year):
+def test_download_czce_history_data(download_path, download_year_futures, download_year_option):
     # Futures.
-    download_file: Path = download_path.joinpath(f'CZCE_futures_{download_year:4d}.zip')
+    download_file: Path = download_path.joinpath(f'CZCE_futures_{download_year_futures:4d}.zip')
 
     # Make sure <download_file_list> not existed.
     if download_file.exists():
@@ -82,7 +101,7 @@ def test_download_czce_history_data(download_path, download_year):
     assert download_file.exists() is False
 
     # Download.
-    download_czce_history_data(download_year, 'futures')
+    download_czce_history_data(download_year_futures, 'futures')
 
     # Test and make clean.
     assert download_file.exists() is True
@@ -90,7 +109,7 @@ def test_download_czce_history_data(download_path, download_year):
     assert download_file.exists() is False
 
     # Option.
-    download_file: Path = download_path.joinpath(f'CZCE_option_{download_year:4d}.zip')
+    download_file: Path = download_path.joinpath(f'CZCE_option_{download_year_option:4d}.zip')
 
     # Make sure <download_file_list> not existed.
     if download_file.exists():
@@ -98,9 +117,31 @@ def test_download_czce_history_data(download_path, download_year):
     assert download_file.exists() is False
 
     # Download.
-    download_czce_history_data(download_year, 'option')
+    download_czce_history_data(download_year_option, 'option')
 
     # Test and make clean.
     assert download_file.exists() is True
     download_file.unlink()
     assert download_file.exists() is False
+
+
+def test_download_czce_history_data_all(download_path):
+    url_mapper = fetch_czce_history_index()
+    download_file_list: List[Path] = []
+    for year in url_mapper['futures'].keys():
+        download_file_list.append(download_path.joinpath(f'CZCE_futures_{year:4d}.zip'))
+    for year in url_mapper['option'].keys():
+        download_file_list.append(download_path.joinpath(f'CZCE_option_{year:4d}.zip'))
+
+    # Make sure <download_file_list> not existed.
+    for download_file in download_file_list:
+        if download_file.exists():
+            download_file.unlink()
+        assert download_file.exists() is False
+
+    download_czce_history_data_all()
+
+    for download_file in download_file_list:
+        assert download_file.exists() is True
+        download_file.unlink()
+        assert download_file.exists() is False

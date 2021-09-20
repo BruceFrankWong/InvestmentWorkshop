@@ -77,3 +77,24 @@ def download_czce_history_data(year: int, type_: str = 'futures'):
         raise requests.exceptions.HTTPError(f'Error in downloading <{url.format(year=year)}>.')
     with open(download_path.joinpath(f'CZCE_{type_}_{year:4d}.zip'), 'wb') as f:
         f.write(response.content)
+
+
+def download_czce_history_data_all():
+    # Make sure <download_path> existed.
+    download_path: Path = Path(CONFIGS['path']['download'])
+    make_directory_existed(download_path)
+
+    # Parameters handle.
+    url_mapper: CZCE_DATA_INDEX = fetch_czce_history_index()
+    url_list: Dict[int, str]
+    type_list: List[str] = ['futures', 'option']
+    for type_ in type_list:
+        url_list = url_mapper['futures']
+        for year in url_list.keys():
+            url = url_list[year]
+            # Download index page.
+            response = requests.get(url)
+            if response.status_code != 200:
+                raise requests.exceptions.HTTPError(f'Error in downloading <{url.format(year=year)}>.')
+            with open(download_path.joinpath(f'CZCE_{type_}_{year:4d}.zip'), 'wb') as f:
+                f.write(response.content)
