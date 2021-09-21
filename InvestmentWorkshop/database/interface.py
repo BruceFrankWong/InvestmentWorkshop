@@ -8,6 +8,7 @@ from pathlib import Path
 
 from peewee import (
     SqliteDatabase,
+    MySQLDatabase,
 )
 
 
@@ -21,3 +22,14 @@ def create_sqlite_database(settings: Dict[str, str]) -> SqliteDatabase:
             'foreign_keys': 1,  # Enforce foreign-key constraints
         }
     )
+
+
+def create_mysql_database(settings: Dict[str, str]) -> MySQLDatabase:
+    return MySQLDatabase(
+        settings['database'],
+        user=settings['user'],
+        password=settings['password'],
+        host=settings['host'],
+        port=settings['port']
+    )
+
