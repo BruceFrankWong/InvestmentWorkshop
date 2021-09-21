@@ -8,7 +8,10 @@ from typing import Dict
 import peewee
 
 from InvestmentWorkshop.utility import PACKAGE_PATH
-from InvestmentWorkshop.database.interface import create_sqlite_database
+from InvestmentWorkshop.database.interface import (
+    create_sqlite_database,
+    create_mysql_database,
+)
 
 
 def test_create_sqlite_database():
@@ -17,3 +20,19 @@ def test_create_sqlite_database():
     }
     result = create_sqlite_database(parameter)
     assert isinstance(result, peewee.SqliteDatabase) is True
+
+
+def test_create_mysql_database():
+    """
+    Test for create_mysql_database.
+    """
+    result = create_mysql_database(
+        {
+            'host': 'localhost',
+            'port': '3306',
+            'database': 'test_database',
+            'user': 'user',
+            'password': 'password'
+        }
+    )
+    assert isinstance(result, peewee.MySQLDatabase) is True
