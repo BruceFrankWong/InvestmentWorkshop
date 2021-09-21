@@ -3,14 +3,17 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Dict
+from typing import Dict, Callable
 from pathlib import Path
 
 from peewee import (
     SqliteDatabase,
     MySQLDatabase,
     PostgresqlDatabase,
+    Database,
 )
+
+from ..utility import CONFIGS
 
 
 def create_sqlite_database(settings: Dict[str, str]) -> SqliteDatabase:
@@ -48,3 +51,20 @@ def create_postgresql_database(settings: Dict[str, str]) -> PostgresqlDatabase:
         host=settings['host'],
         port=settings['port']
     )
+
+
+def create_database() -> Database:
+    driver_mapper: Dict[str, Callable] = {
+        'SQLITE': create_sqlite_database,
+        'MYSQL': create_mysql_database,
+        'POSTGRESQL': create_postgresql_database,
+    }
+
+    driver: str = CONFIGS['database']['driver'].upper()
+
+    assert driver in driver_mapper.keys()
+
+    return driver_mapper[driver](CONFIGS['database'])
+
+
+db: Database = create_database()
