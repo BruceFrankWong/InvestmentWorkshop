@@ -50,3 +50,7 @@ def unzip_file(zip_file: Path) -> List[Path]:
         result.append(correct_filename)
 
     return result
+
+
+def write_to_database(quote: List[QUOTE]):
+    pass
