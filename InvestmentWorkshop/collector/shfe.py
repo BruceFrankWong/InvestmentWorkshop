@@ -13,7 +13,7 @@ __author__ = 'Bruce Frank Wong'
 """
 
 
-from typing import List, Dict, Any
+from typing import List, Dict
 from pathlib import Path
 import datetime as dt
 
@@ -21,7 +21,7 @@ import requests
 import xlrd
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed
+from .utility import make_directory_existed, QUOTE
 
 
 def download_shfe_history_data(year: int):
@@ -62,13 +62,13 @@ def download_shfe_history_data_all():
         download_shfe_history_data(year)
 
 
-def read_shfe_history_data(xls_file: Path) -> List[Dict[str, Any]]:
+def read_shfe_history_data(xls_file: Path) -> List[QUOTE]:
     """
     Read quote data from file.
     :param xls_file: a Path-like object.
     :return: a list.
     """
-    result: List[Dict[str, Any]] = []
+    result: List[QUOTE] = []
 
     # Read .xls files.
     workbook = xlrd.open_workbook(xls_file)

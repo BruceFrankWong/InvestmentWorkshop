@@ -3,9 +3,12 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List
+from typing import Any, Dict, List
 from pathlib import Path
 import zipfile
+
+
+QUOTE = Dict[str, Any]
 
 
 def make_directory_existed(directory: Path) -> None:

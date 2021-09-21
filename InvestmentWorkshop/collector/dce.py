@@ -16,28 +16,10 @@ from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.utils.cell import coordinate_from_string
 
 from ..utility import CONFIGS
+from .utility import QUOTE
 
 
 DCE_History_URL_Index = Dict[int, Dict[str, str]]
-
-"""
-DCE_History_Quote: a list object, each item is a dict, and the keys is:
-    'symbol',
-    'date',
-    'previous_close',
-    'previous_settlement',
-    'open',
-    'high',
-    'low',
-    'close',
-    'settlement',
-    'change_on_close',
-    'change_on_settlement',
-    'volume',
-    'amount',
-    'open_interest',
-"""
-DCE_History_Quote = List[Dict[str, Any]]
 
 
 def fetch_dce_history_index() -> DCE_History_URL_Index:
@@ -118,18 +100,18 @@ def correct_format(file_path: Path) -> str:
     return '.csv'
 
 
-def read_dce_history_data_xls(xls_path: Path) -> DCE_History_Quote:
+def read_dce_history_data_xls(xls_path: Path) -> List[QUOTE]:
     """
     Read quote data from .xls file.
     :param xls_path: a Path-like object.
-    :return: DCE_History_Quote.
+    :return: List[QUOTE].
     """
     assert xls_path.exists() is True
 
     # It seemed that only
     assert '期权' in xls_path.stem
 
-    result: DCE_History_Quote = []
+    result: List[QUOTE] = []
 
     # Read .xls files.
     workbook = xlrd.open_workbook(xls_path)
@@ -171,13 +153,13 @@ def read_dce_history_data_xls(xls_path: Path) -> DCE_History_Quote:
     return result
 
 
-def read_dce_history_data_xlsx(xlsx_path: Path) -> DCE_History_Quote:
+def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QUOTE]:
     """
     Read quote data from .xlsx file.
     :param xlsx_path: a Path-like object.
-    :return: DCE_History_Quote.
+    :return: List[QUOTE].
     """
-    result: DCE_History_Quote = []
+    result: List[QUOTE] = []
     assert xlsx_path.exists() is True
     workbook: Workbook = load_workbook(filename=xlsx_path)
     worksheet: Worksheet = workbook.active
@@ -263,9 +245,9 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> DCE_History_Quote:
     return result
 
 
-def read_dce_history_data_csv(csv_path: Path) -> DCE_History_Quote:
+def read_dce_history_data_csv(csv_path: Path) -> List[QUOTE]:
     assert csv_path.exists() is True
-    result: DCE_History_Quote = []
+    result: List[QUOTE] = []
     with open(csv_path, mode='r', encoding='gbk') as csv_file:
         reader = csv.DictReader(csv_file)
         if '期权' in csv_path.stem:
@@ -323,7 +305,7 @@ def read_dce_history_data_csv(csv_path: Path) -> DCE_History_Quote:
     return result
 
 
-def read_dce_history_data(data_file: Path) -> DCE_History_Quote:
+def read_dce_history_data(data_file: Path) -> List[QUOTE]:
     assert data_file.exists() is True
     extension: str = data_file.suffix
     if extension == '.csv':

@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Dict, Any
+from typing import List
 from pathlib import Path
 import datetime as dt
 import csv
@@ -11,7 +11,7 @@ import csv
 import requests
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed
+from .utility import make_directory_existed, QUOTE
 
 
 def download_cffex_history_data(month_required: dt.date) -> None:
@@ -72,13 +72,13 @@ def download_cffex_history_data_all() -> None:
         download_cffex_history_data(item)
 
 
-def read_cffex_history_data(csv_file: Path) -> List[Dict[str, Any]]:
+def read_cffex_history_data(csv_file: Path) -> List[QUOTE]:
     """
     Read quote data from file (csv).
     :param csv_file:
     :return:
     """
-    result: List[Dict[str, Any]] = []
+    result: List[QUOTE] = []
 
     # Handle date.
     filename: str = csv_file.name[:8]

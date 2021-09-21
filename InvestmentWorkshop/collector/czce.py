@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Dict, Any
+from typing import List, Dict
 from pathlib import Path
 import datetime as dt
 
@@ -11,7 +11,7 @@ import requests
 from lxml import etree
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed
+from .utility import make_directory_existed, QUOTE
 
 
 CZCE_DATA_INDEX = Dict[str, Dict[int, str]]
@@ -101,10 +101,10 @@ def download_czce_history_data_all():
                 f.write(response.content)
 
 
-def read_czce_history_data(data_file: Path) -> List[Dict[str, Any]]:
+def read_czce_history_data(data_file: Path) -> List[QUOTE]:
     assert data_file.exists() is True
 
-    result: List[Dict[str, Any]] = []
+    result: List[QUOTE] = []
 
     try:
         with open(data_file, mode='r', encoding='gbk') as txt_file:
