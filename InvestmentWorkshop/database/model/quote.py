@@ -66,3 +66,19 @@ class FuturesQuoteTick(BasicModel):
     pre_close = FloatField(verbose_name='前收盘价')
     limit_up = FloatField(verbose_name='涨停价')
     limit_down = FloatField(verbose_name='跌停价')
+
+
+class FuturesQuoteBase(BasicModel):
+    """
+    Quote of futures, base.
+    """
+    exchange = CharField(verbose_name='交易所')
+    product = FixedCharField(verbose_name='品种', max_length=2)
+    contract = FixedCharField(verbose_name='合约', max_length=4)
+    date = DateField(verbose_name='日期')
+    open = FloatField(verbose_name='开盘价')
+    high = FloatField(verbose_name='最高价')
+    low = FloatField(verbose_name='最低价')
+    close = FloatField(verbose_name='收盘价')
+    volume = IntegerField(verbose_name='成交量')
+    open_interest = IntegerField(verbose_name='持仓量')
