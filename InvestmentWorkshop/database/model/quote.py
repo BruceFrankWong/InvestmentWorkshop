@@ -22,7 +22,7 @@ class FuturesQuoteTick(BasicModel):
     """
     id = AutoField(primary_key=True)
 
-    exchange = CharField(verbose_name='合约')
+    exchange = CharField(verbose_name='交易所')
     product = FixedCharField(verbose_name='品种', max_length=2)
     contract = FixedCharField(verbose_name='合约', max_length=4)
 
