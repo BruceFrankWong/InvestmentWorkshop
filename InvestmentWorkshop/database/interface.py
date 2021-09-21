@@ -9,6 +9,7 @@ from pathlib import Path
 from peewee import (
     SqliteDatabase,
     MySQLDatabase,
+    PostgresqlDatabase,
 )
 
 
@@ -33,3 +34,17 @@ def create_mysql_database(settings: Dict[str, str]) -> MySQLDatabase:
         port=settings['port']
     )
 
+
+def create_postgresql_database(settings: Dict[str, str]) -> PostgresqlDatabase:
+    """
+    Create a PostgreSQL connect.
+    :param settings:
+    :return:
+    """
+    return PostgresqlDatabase(
+        settings['database'],
+        user=settings['user'],
+        password=settings['password'],
+        host=settings['host'],
+        port=settings['port']
+    )
