@@ -11,6 +11,7 @@ from peewee import (
     FloatField,
     IntegerField,
     BigIntegerField,
+    TimeField,
 )
 
 from .base import BasicModel
@@ -91,3 +92,59 @@ class FuturesQuoteDaily(FuturesQuoteBase):
     id = AutoField(primary_key=True)
     amount = FloatField(verbose_name='成交额')
     settlement = FloatField(verbose_name='结算价')
+
+
+class FuturesQuotationMinute1(FuturesQuoteBase):
+    """
+    Quote of futures, 1 minute.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
+
+
+class FuturesQuotationMinute3(FuturesQuoteBase):
+    """
+    Quote of futures, 3 minute.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
+
+
+class FuturesQuotationMinute5(FuturesQuoteBase):
+    """
+    Quote of futures, 5 minute.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
+
+
+class FuturesQuotationMinute15(FuturesQuoteBase):
+    """
+    Quote of futures, 15 minute.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
+
+
+class FuturesQuotationMinute30(FuturesQuoteBase):
+    """
+    Quote of futures, 15 minute.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
+
+
+class FuturesQuotationHour(FuturesQuoteBase):
+    """
+    Quote of futures, 1 hour.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
+
+
+class FuturesQuotationHourNatural(FuturesQuoteBase):
+    """
+    Quote of futures, 1 hour, by clock.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
