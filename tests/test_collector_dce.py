@@ -11,7 +11,7 @@ import datetime as dt
 import random
 
 from InvestmentWorkshop.utility import CONFIGS
-from InvestmentWorkshop.collector.utility import unzip_quote_file
+from InvestmentWorkshop.collector.utility import unzip_file
 from InvestmentWorkshop.collector.dce import (
     fetch_dce_history_index,
     download_dce_history_data,
@@ -214,7 +214,7 @@ def test_read_dce_history_data(download_path, start_year, this_year):
     unzipped_file_list: List[Path] = []
     for zip_file in zip_list:
         year: str = zip_file.stem.split('_')[-1]
-        for unzipped_file in unzip_quote_file(zip_file):
+        for unzipped_file in unzip_file(zip_file):
             new_file_path: Path = download_path.joinpath(
                 'unzip',
                 f'{unzipped_file.stem}_{year}{unzipped_file.suffix}'

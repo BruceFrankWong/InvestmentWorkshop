@@ -11,7 +11,7 @@ import datetime as dt
 import random
 
 from InvestmentWorkshop.utility import CONFIGS
-from InvestmentWorkshop.collector.utility import unzip_quote_file
+from InvestmentWorkshop.collector.utility import unzip_file
 from InvestmentWorkshop.collector.cffex import (
     download_cffex_history_data,
     download_cffex_history_data_all,
@@ -146,7 +146,7 @@ def test_read_cffex_history_data(download_date, download_path):
     assert download_file.exists() is True
 
     # Unzip <download_file>.
-    unzip_file_list: List[Path] = list(unzip_quote_file(download_file))
+    unzip_file_list: List[Path] = list(unzip_file(download_file))
     csv_file: Path
     for csv_file in unzip_file_list:
         assert csv_file.exists() is True

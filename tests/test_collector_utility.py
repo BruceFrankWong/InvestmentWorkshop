@@ -11,7 +11,7 @@ from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.shfe import download_shfe_history_data
 from InvestmentWorkshop.collector.utility import (
     make_directory_existed,
-    unzip_quote_file,
+    unzip_file,
 )
 
 
@@ -74,7 +74,7 @@ def test_unzip_quote_file():
     assert download_file.exists() is True
 
     # Unzip
-    file_list = unzip_quote_file(download_file)
+    file_list = unzip_file(download_file)
 
     # Test.
     assert isinstance(file_list, list)

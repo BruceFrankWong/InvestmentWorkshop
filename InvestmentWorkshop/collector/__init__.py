@@ -5,7 +5,7 @@ __author__ = 'Bruce Frank Wong'
 
 from .utility import (
     make_directory_existed,
-    unzip_quote_file,
+    unzip_file,
     QUOTE,
 )
 from .shfe import (
