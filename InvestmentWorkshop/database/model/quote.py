@@ -82,3 +82,12 @@ class FuturesQuoteBase(BasicModel):
     close = FloatField(verbose_name='收盘价')
     volume = IntegerField(verbose_name='成交量')
     open_interest = IntegerField(verbose_name='持仓量')
+
+
+class FuturesQuoteDaily(FuturesQuoteBase):
+    """
+    Quote of futures, daily.
+    """
+    id = AutoField(primary_key=True)
+    amount = FloatField(verbose_name='成交额')
+    settlement = FloatField(verbose_name='结算价')
