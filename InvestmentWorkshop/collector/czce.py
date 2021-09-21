@@ -89,7 +89,7 @@ def download_czce_history_data_all():
     url_list: Dict[int, str]
     type_list: List[str] = ['futures', 'option']
     for type_ in type_list:
-        url_list = url_mapper['futures']
+        url_list = url_mapper[type_]
         for year in url_list.keys():
             url = url_list[year]
             # Download index page.
