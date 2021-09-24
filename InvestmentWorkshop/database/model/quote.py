@@ -77,9 +77,9 @@ class FuturesQuoteBase(BasicModel):
     product = FixedCharField(verbose_name='品种', max_length=2)
     contract = FixedCharField(verbose_name='合约', max_length=4)
     date = DateField(verbose_name='日期')
-    open = FloatField(verbose_name='开盘价')
-    high = FloatField(verbose_name='最高价')
-    low = FloatField(verbose_name='最低价')
+    open = FloatField(verbose_name='开盘价', null=True)
+    high = FloatField(verbose_name='最高价', null=True)
+    low = FloatField(verbose_name='最低价', null=True)
     close = FloatField(verbose_name='收盘价')
     volume = IntegerField(verbose_name='成交量')
     open_interest = IntegerField(verbose_name='持仓量')
@@ -94,7 +94,7 @@ class FuturesQuoteDaily(FuturesQuoteBase):
     settlement = FloatField(verbose_name='结算价')
 
 
-class FuturesQuotationMinute1(FuturesQuoteBase):
+class FuturesQuoteMinute1(FuturesQuoteBase):
     """
     Quote of futures, 1 minute.
     """
@@ -102,7 +102,7 @@ class FuturesQuotationMinute1(FuturesQuoteBase):
     time = TimeField(verbose_name='时间')
 
 
-class FuturesQuotationMinute3(FuturesQuoteBase):
+class FuturesQuoteMinute3(FuturesQuoteBase):
     """
     Quote of futures, 3 minute.
     """
@@ -110,7 +110,7 @@ class FuturesQuotationMinute3(FuturesQuoteBase):
     time = TimeField(verbose_name='时间')
 
 
-class FuturesQuotationMinute5(FuturesQuoteBase):
+class FuturesQuoteMinute5(FuturesQuoteBase):
     """
     Quote of futures, 5 minute.
     """
@@ -118,7 +118,7 @@ class FuturesQuotationMinute5(FuturesQuoteBase):
     time = TimeField(verbose_name='时间')
 
 
-class FuturesQuotationMinute15(FuturesQuoteBase):
+class FuturesQuoteMinute15(FuturesQuoteBase):
     """
     Quote of futures, 15 minute.
     """
@@ -126,15 +126,23 @@ class FuturesQuotationMinute15(FuturesQuoteBase):
     time = TimeField(verbose_name='时间')
 
 
-class FuturesQuotationMinute30(FuturesQuoteBase):
+class FuturesQuoteMinute30(FuturesQuoteBase):
     """
-    Quote of futures, 15 minute.
+    Quote of futures, 30 minute.
     """
     id = AutoField(primary_key=True)
     time = TimeField(verbose_name='时间')
 
 
-class FuturesQuotationHour(FuturesQuoteBase):
+class FuturesQuoteMinute30Natural(FuturesQuoteBase):
+    """
+    Quote of futures, 30 minute, by clock.
+    """
+    id = AutoField(primary_key=True)
+    time = TimeField(verbose_name='时间')
+
+
+class FuturesQuoteHour1(FuturesQuoteBase):
     """
     Quote of futures, 1 hour.
     """
@@ -142,7 +150,7 @@ class FuturesQuotationHour(FuturesQuoteBase):
     time = TimeField(verbose_name='时间')
 
 
-class FuturesQuotationHourNatural(FuturesQuoteBase):
+class FuturesQuoteHour1Natural(FuturesQuoteBase):
     """
     Quote of futures, 1 hour, by clock.
     """
