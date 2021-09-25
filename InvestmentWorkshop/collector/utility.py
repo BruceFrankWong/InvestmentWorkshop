@@ -6,11 +6,18 @@ __author__ = 'Bruce Frank Wong'
 from typing import Any, Dict, List
 from pathlib import Path
 import zipfile
+from enum import Enum
 
 from ..utility import CONFIGS
 
 
 QuoteDaily = Dict[str, Any]
+
+
+class QuoteType(Enum):
+    Stock = 'Stock'
+    Futures = 'Futures'
+    Option = 'Option'
 
 
 def make_directory_existed(directory: Path) -> None:
