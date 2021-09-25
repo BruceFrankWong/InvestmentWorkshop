@@ -242,6 +242,12 @@ def test_read_czce_history_data(download_path):
                 assert 'exercise' in item.keys()
                 assert isinstance(item['exercise'], int)
             else:
+                # 品种
+                assert isinstance(item['product'], str)
+                assert len(item['product']) <= 2
+                # 交割月份
+                assert isinstance(item['contract'], str)
+                assert len(item['contract']) == 4
                 # 交割结算价
                 assert 'delivery_settlement' in item.keys()
                 if item['delivery_settlement'] is not None:
