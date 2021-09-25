@@ -40,9 +40,9 @@ def test_make_directory_existed():
     assert test_directory.exists() is False
 
 
-def test_unzip_quote_file():
+def test_unzip_file():
     """
-    Test for <InvestmentWorkshop.collector.shfe.unzip_quote_file>.
+    Test for <InvestmentWorkshop.collector.utility.unzip_file>.
 
     :return:
     """
