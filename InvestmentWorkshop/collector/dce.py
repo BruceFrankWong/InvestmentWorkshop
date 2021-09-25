@@ -16,7 +16,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.utils.cell import coordinate_from_string
 
 from ..utility import CONFIGS
-from .utility import QuoteDaily
+from .utility import QuoteDaily, split_symbol
 
 
 DCE_History_URL_Index = Dict[int, Dict[str, str]]
@@ -224,10 +224,13 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QuoteDaily]:
         else:
             if '成交金额' in column_list:
                 column_list[column_list.index('成交金额')] = '成交额'
+            product, contract = split_symbol(symbol)
             result.append(
                 {
                     'exchange': 'DCE',
                     'symbol': symbol,
+                    'product': product,
+                    'contract': contract,
                     'date': day,
                     'open': None if price_open is None or price_open == 0 or price_open == 0.0 else float(price_open),
                     'high': None if price_high is None or price_high == 0 or price_high == 0.0 else float(price_high),
@@ -282,10 +285,14 @@ def read_dce_history_data_csv(csv_path: Path) -> List[QuoteDaily]:
                 )
         else:
             for row in reader:
+                symbol = row['合约'].strip()
+                product, contract = split_symbol(symbol)
                 result.append(
                     {
                         'exchange': 'DCE',
-                        'symbol': row['合约'].strip(),
+                        'symbol': symbol,
+                        'product': product,
+                        'contract': contract,
                         'date': dt.date(
                             year=int(row['日期'][:4]),
                             month=int(row['日期'][4:6]),
