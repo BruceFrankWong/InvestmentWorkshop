@@ -21,7 +21,7 @@ import requests
 import xlrd
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed, QuoteDaily
+from .utility import QuoteDaily, make_directory_existed, split_symbol
 
 
 def download_shfe_history_data(year: int):
@@ -100,10 +100,13 @@ def read_shfe_history_data(xls_file: Path) -> List[QuoteDaily]:
             continue
         if row[mapper['symbol']].ctype != 0:
             last_symbol = row[mapper['symbol']].value
+        product, contract = split_symbol(last_symbol)
         result.append(
             {
                 'exchange': 'SHFE',
                 'symbol': last_symbol,
+                'product': product,
+                'contract': contract,
                 'date': dt.date(
                     year=int(row[mapper['date']].value[:4]),
                     month=int(row[mapper['date']].value[4:6]),

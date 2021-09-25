@@ -133,6 +133,10 @@ def test_read_shfe_history_data(download_path, download_year):
         for item in result:
             assert isinstance(item, dict)
             assert isinstance(item['symbol'], str)
+            assert isinstance(item['product'], str)
+            assert len(item['product']) <= 2
+            assert isinstance(item['contract'], str)
+            assert len(item['contract']) == 4
             assert isinstance(item['date'], dt.date)
             assert isinstance(item['previous_close'], float)
             assert isinstance(item['previous_settlement'], float)
