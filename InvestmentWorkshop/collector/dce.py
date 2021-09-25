@@ -126,6 +126,7 @@ def read_dce_history_data_xls(xls_path: Path) -> List[QuoteDaily]:
                 print(f'Error in {xls_path} at row {i}')
             result.append(
                 {
+                    'exchange': 'DCE',
                     'symbol': row[xls_column_list.index('合约名称')].value,
                     'date': dt.date(
                         year=int(date_str[:4]),
@@ -196,6 +197,7 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QuoteDaily]:
         if '期权' in xlsx_path.stem:
             result.append(
                 {
+                    'exchange': 'DCE',
                     'symbol': symbol,
                     'date': day,
                     'open': None if price_open is None or price_open == 0 or price_open == 0.0 else float(price_open),
@@ -224,6 +226,7 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QuoteDaily]:
                 column_list[column_list.index('成交金额')] = '成交额'
             result.append(
                 {
+                    'exchange': 'DCE',
                     'symbol': symbol,
                     'date': day,
                     'open': None if price_open is None or price_open == 0 or price_open == 0.0 else float(price_open),
@@ -254,6 +257,7 @@ def read_dce_history_data_csv(csv_path: Path) -> List[QuoteDaily]:
             for row in reader:
                 result.append(
                     {
+                        'exchange': 'DCE',
                         'symbol': row['合约名称'].strip(),
                         'date': dt.date(
                             year=int(row['交易日期'][:4]),
@@ -280,6 +284,7 @@ def read_dce_history_data_csv(csv_path: Path) -> List[QuoteDaily]:
             for row in reader:
                 result.append(
                     {
+                        'exchange': 'DCE',
                         'symbol': row['合约'].strip(),
                         'date': dt.date(
                             year=int(row['日期'][:4]),

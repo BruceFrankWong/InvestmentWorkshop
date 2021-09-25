@@ -102,6 +102,7 @@ def read_shfe_history_data(xls_file: Path) -> List[QuoteDaily]:
             last_symbol = row[mapper['symbol']].value
         result.append(
             {
+                'exchange': 'SHFE',
                 'symbol': last_symbol,
                 'date': dt.date(
                     year=int(row[mapper['date']].value[:4]),

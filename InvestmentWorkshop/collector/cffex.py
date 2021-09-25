@@ -97,6 +97,7 @@ def read_cffex_history_data(csv_file: Path) -> List[QuoteDaily]:
             try:
                 result.append(
                     {
+                        'exchange': 'CFFEX',
                         'date': date,
                         'symbol': row['合约代码'].strip(),
                         'open': float(row['今开盘']) if len(row['今开盘']) > 0 else 0.0,
