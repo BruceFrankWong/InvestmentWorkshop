@@ -76,7 +76,6 @@ def test_download_cffex_history_data(download_path, download_date):
 
     # make clean.
     download_file.unlink()
-    print(download_file)
     assert download_file.exists() is False
 
 
@@ -121,7 +120,6 @@ def test_download_cffex_history_data_all():
 
     # make clean.
     for download_file in file_list:
-        print(download_file)
         download_file.unlink()
         assert download_file.exists() is False
 
@@ -156,6 +154,10 @@ def test_read_cffex_history_data(download_date, download_path):
         for item in result:
             assert isinstance(item, dict)
             assert isinstance(item['symbol'], str)
+            assert isinstance(item['product'], str)
+            assert len(item['product']) <= 2
+            assert isinstance(item['contract'], str)
+            assert len(item['contract']) == 4
             assert isinstance(item['date'], dt.date)
             assert isinstance(item['previous_settlement'], float)
             assert isinstance(item['open'], float)
