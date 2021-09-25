@@ -9,6 +9,7 @@ import zipfile
 from enum import Enum
 
 from ..utility import CONFIGS
+from ..database import db, FuturesQuoteDaily
 
 
 QuoteDaily = Dict[str, Any]
@@ -59,5 +60,33 @@ def unzip_file(zip_file: Path) -> List[Path]:
     return result
 
 
-def write_to_database(quote: List[QuoteDaily]):
-    pass
+def write_to_database(quote: List[QuoteDaily], type_: QuoteType):
+    data_list: List[Any] = []
+    if type_ == QuoteType.Stock:
+        pass
+    elif type_ == QuoteType.Futures:
+        FuturesQuoteDaily.create_table()
+        [
+            data_list.append(
+                FuturesQuoteDaily(
+                    exchange=item['exchange'],
+                    product=item['symbol'][:-4],
+                    contract=item['symbol'][-4:],
+                    date=item['date'],
+                    open=item['open'],
+                    high=item['high'],
+                    low=item['low'],
+                    close=item['close'],
+                    volume=item['volume'],
+                    open_interest=item['open_interest'],
+                    amount=item['amount'],
+                    settlement=item['settlement'],
+                )
+            ) for item in quote
+        ]
+        with db.atomic():
+            FuturesQuoteDaily.bulk_create(data_list, batch_size=100)
+    elif type_ == QuoteType.Option:
+        pass
+    else:
+        raise ValueError('Unknown QuoteType value.')
