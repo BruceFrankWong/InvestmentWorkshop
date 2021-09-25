@@ -21,7 +21,7 @@ import requests
 import xlrd
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed, QUOTE
+from .utility import make_directory_existed, QuoteDaily
 
 
 def download_shfe_history_data(year: int):
@@ -62,13 +62,13 @@ def download_shfe_history_data_all():
         download_shfe_history_data(year)
 
 
-def read_shfe_history_data(xls_file: Path) -> List[QUOTE]:
+def read_shfe_history_data(xls_file: Path) -> List[QuoteDaily]:
     """
     Read quote data from file.
     :param xls_file: a Path-like object.
     :return: a list.
     """
-    result: List[QUOTE] = []
+    result: List[QuoteDaily] = []
 
     # Read .xls files.
     workbook = xlrd.open_workbook(xls_file)

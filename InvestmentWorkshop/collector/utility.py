@@ -10,7 +10,7 @@ import zipfile
 from ..utility import CONFIGS
 
 
-QUOTE = Dict[str, Any]
+QuoteDaily = Dict[str, Any]
 
 
 def make_directory_existed(directory: Path) -> None:
@@ -52,5 +52,5 @@ def unzip_file(zip_file: Path) -> List[Path]:
     return result
 
 
-def write_to_database(quote: List[QUOTE]):
+def write_to_database(quote: List[QuoteDaily]):
     pass

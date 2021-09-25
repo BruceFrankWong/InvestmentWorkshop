@@ -11,7 +11,7 @@ import requests
 from lxml import etree
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed, QUOTE
+from .utility import make_directory_existed, QuoteDaily
 
 
 CZCE_DATA_INDEX = Dict[str, Dict[int, str]]
@@ -101,10 +101,10 @@ def download_czce_history_data_all():
                 f.write(response.content)
 
 
-def read_czce_history_data(data_file: Path) -> List[QUOTE]:
+def read_czce_history_data(data_file: Path) -> List[QuoteDaily]:
     assert data_file.exists() is True
 
-    result: List[QUOTE] = []
+    result: List[QuoteDaily] = []
 
     try:
         with open(data_file, mode='r', encoding='gbk') as txt_file:
@@ -124,6 +124,8 @@ def read_czce_history_data(data_file: Path) -> List[QUOTE]:
         if 'option' in data_file.stem:
             result.append(
                 {
+                    # 交易所
+                    'exchange': 'CZCE',
                     # 交易日期
                     'date': dt.date.fromisoformat(data[0]),
                     # 合约代码
@@ -163,6 +165,8 @@ def read_czce_history_data(data_file: Path) -> List[QUOTE]:
         else:
             result.append(
                 {
+                    # 交易所
+                    'exchange': 'CZCE',
                     # 交易日期
                     'date': dt.date.fromisoformat(data[0]),
                     # 合约代码

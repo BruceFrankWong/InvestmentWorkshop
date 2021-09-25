@@ -16,7 +16,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.utils.cell import coordinate_from_string
 
 from ..utility import CONFIGS
-from .utility import QUOTE
+from .utility import QuoteDaily
 
 
 DCE_History_URL_Index = Dict[int, Dict[str, str]]
@@ -100,7 +100,7 @@ def correct_format(file_path: Path) -> str:
     return '.csv'
 
 
-def read_dce_history_data_xls(xls_path: Path) -> List[QUOTE]:
+def read_dce_history_data_xls(xls_path: Path) -> List[QuoteDaily]:
     """
     Read quote data from .xls file.
     :param xls_path: a Path-like object.
@@ -111,7 +111,7 @@ def read_dce_history_data_xls(xls_path: Path) -> List[QUOTE]:
     # It seemed that only
     assert '期权' in xls_path.stem
 
-    result: List[QUOTE] = []
+    result: List[QuoteDaily] = []
 
     # Read .xls files.
     workbook = xlrd.open_workbook(xls_path)
@@ -153,13 +153,13 @@ def read_dce_history_data_xls(xls_path: Path) -> List[QUOTE]:
     return result
 
 
-def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QUOTE]:
+def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QuoteDaily]:
     """
     Read quote data from .xlsx file.
     :param xlsx_path: a Path-like object.
     :return: List[QUOTE].
     """
-    result: List[QUOTE] = []
+    result: List[QuoteDaily] = []
     assert xlsx_path.exists() is True
     workbook: Workbook = load_workbook(filename=xlsx_path)
     worksheet: Worksheet = workbook.active
@@ -245,9 +245,9 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QUOTE]:
     return result
 
 
-def read_dce_history_data_csv(csv_path: Path) -> List[QUOTE]:
+def read_dce_history_data_csv(csv_path: Path) -> List[QuoteDaily]:
     assert csv_path.exists() is True
-    result: List[QUOTE] = []
+    result: List[QuoteDaily] = []
     with open(csv_path, mode='r', encoding='gbk') as csv_file:
         reader = csv.DictReader(csv_file)
         if '期权' in csv_path.stem:
@@ -305,7 +305,7 @@ def read_dce_history_data_csv(csv_path: Path) -> List[QUOTE]:
     return result
 
 
-def read_dce_history_data(data_file: Path) -> List[QUOTE]:
+def read_dce_history_data(data_file: Path) -> List[QuoteDaily]:
     assert data_file.exists() is True
     extension: str = data_file.suffix
     if extension == '.csv':

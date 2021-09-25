@@ -6,7 +6,7 @@ __author__ = 'Bruce Frank Wong'
 from .utility import (
     make_directory_existed,
     unzip_file,
-    QUOTE,
+    QuoteDaily,
 )
 from .shfe import (
     download_shfe_history_data,

@@ -11,7 +11,7 @@ import csv
 import requests
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed, QUOTE
+from .utility import make_directory_existed, QuoteDaily
 
 
 def download_cffex_history_data(month_required: dt.date) -> None:
@@ -72,13 +72,13 @@ def download_cffex_history_data_all() -> None:
         download_cffex_history_data(item)
 
 
-def read_cffex_history_data(csv_file: Path) -> List[QUOTE]:
+def read_cffex_history_data(csv_file: Path) -> List[QuoteDaily]:
     """
     Read quote data from file (csv).
     :param csv_file:
     :return:
     """
-    result: List[QUOTE] = []
+    result: List[QuoteDaily] = []
 
     # Handle date.
     filename: str = csv_file.name[:8]
