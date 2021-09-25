@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from pathlib import Path
 import zipfile
 from enum import Enum
@@ -58,6 +58,14 @@ def unzip_file(zip_file: Path) -> List[Path]:
         result.append(correct_filename)
 
     return result
+
+
+def split_symbol(symbol: str) -> Tuple[str, str]:
+    digital_list: List[str] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ]
+    if symbol[1] in digital_list:
+        return symbol[0], symbol[1:]
+    else:
+        return symbol[:2], symbol[2:]
 
 
 def write_to_database(quote: List[QuoteDaily], type_: QuoteType):
