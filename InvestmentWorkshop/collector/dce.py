@@ -16,28 +16,10 @@ from openpyxl.worksheet.worksheet import Worksheet
 from openpyxl.utils.cell import coordinate_from_string
 
 from ..utility import CONFIGS
+from .utility import QuoteDaily, split_symbol
 
 
 DCE_History_URL_Index = Dict[int, Dict[str, str]]
-
-"""
-DCE_History_Quote: a list object, each item is a dict, and the keys is:
-    'symbol',
-    'date',
-    'previous_close',
-    'previous_settlement',
-    'open',
-    'high',
-    'low',
-    'close',
-    'settlement',
-    'change_on_close',
-    'change_on_settlement',
-    'volume',
-    'amount',
-    'open_interest',
-"""
-DCE_History_Quote = List[Dict[str, Any]]
 
 
 def fetch_dce_history_index() -> DCE_History_URL_Index:
@@ -118,18 +100,18 @@ def correct_format(file_path: Path) -> str:
     return '.csv'
 
 
-def read_dce_history_data_xls(xls_path: Path) -> DCE_History_Quote:
+def read_dce_history_data_xls(xls_path: Path) -> List[QuoteDaily]:
     """
     Read quote data from .xls file.
     :param xls_path: a Path-like object.
-    :return: DCE_History_Quote.
+    :return: List[QUOTE].
     """
     assert xls_path.exists() is True
 
     # It seemed that only
     assert '期权' in xls_path.stem
 
-    result: DCE_History_Quote = []
+    result: List[QuoteDaily] = []
 
     # Read .xls files.
     workbook = xlrd.open_workbook(xls_path)
@@ -144,6 +126,7 @@ def read_dce_history_data_xls(xls_path: Path) -> DCE_History_Quote:
                 print(f'Error in {xls_path} at row {i}')
             result.append(
                 {
+                    'exchange': 'DCE',
                     'symbol': row[xls_column_list.index('合约名称')].value,
                     'date': dt.date(
                         year=int(date_str[:4]),
@@ -171,13 +154,13 @@ def read_dce_history_data_xls(xls_path: Path) -> DCE_History_Quote:
     return result
 
 
-def read_dce_history_data_xlsx(xlsx_path: Path) -> DCE_History_Quote:
+def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QuoteDaily]:
     """
     Read quote data from .xlsx file.
     :param xlsx_path: a Path-like object.
-    :return: DCE_History_Quote.
+    :return: List[QUOTE].
     """
-    result: DCE_History_Quote = []
+    result: List[QuoteDaily] = []
     assert xlsx_path.exists() is True
     workbook: Workbook = load_workbook(filename=xlsx_path)
     worksheet: Worksheet = workbook.active
@@ -214,6 +197,7 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> DCE_History_Quote:
         if '期权' in xlsx_path.stem:
             result.append(
                 {
+                    'exchange': 'DCE',
                     'symbol': symbol,
                     'date': day,
                     'open': None if price_open is None or price_open == 0 or price_open == 0.0 else float(price_open),
@@ -240,9 +224,13 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> DCE_History_Quote:
         else:
             if '成交金额' in column_list:
                 column_list[column_list.index('成交金额')] = '成交额'
+            product, contract = split_symbol(symbol)
             result.append(
                 {
+                    'exchange': 'DCE',
                     'symbol': symbol,
+                    'product': product,
+                    'contract': contract,
                     'date': day,
                     'open': None if price_open is None or price_open == 0 or price_open == 0.0 else float(price_open),
                     'high': None if price_high is None or price_high == 0 or price_high == 0.0 else float(price_high),
@@ -263,15 +251,16 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> DCE_History_Quote:
     return result
 
 
-def read_dce_history_data_csv(csv_path: Path) -> DCE_History_Quote:
+def read_dce_history_data_csv(csv_path: Path) -> List[QuoteDaily]:
     assert csv_path.exists() is True
-    result: DCE_History_Quote = []
+    result: List[QuoteDaily] = []
     with open(csv_path, mode='r', encoding='gbk') as csv_file:
         reader = csv.DictReader(csv_file)
         if '期权' in csv_path.stem:
             for row in reader:
                 result.append(
                     {
+                        'exchange': 'DCE',
                         'symbol': row['合约名称'].strip(),
                         'date': dt.date(
                             year=int(row['交易日期'][:4]),
@@ -296,9 +285,14 @@ def read_dce_history_data_csv(csv_path: Path) -> DCE_History_Quote:
                 )
         else:
             for row in reader:
+                symbol = row['合约'].strip()
+                product, contract = split_symbol(symbol)
                 result.append(
                     {
-                        'symbol': row['合约'].strip(),
+                        'exchange': 'DCE',
+                        'symbol': symbol,
+                        'product': product,
+                        'contract': contract,
                         'date': dt.date(
                             year=int(row['日期'][:4]),
                             month=int(row['日期'][4:6]),
@@ -323,7 +317,7 @@ def read_dce_history_data_csv(csv_path: Path) -> DCE_History_Quote:
     return result
 
 
-def read_dce_history_data(data_file: Path) -> DCE_History_Quote:
+def read_dce_history_data(data_file: Path) -> List[QuoteDaily]:
     assert data_file.exists() is True
     extension: str = data_file.suffix
     if extension == '.csv':

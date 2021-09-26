@@ -3,6 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
+from typing import List, Tuple
 from pathlib import Path
 import random
 import datetime as dt
@@ -11,7 +12,8 @@ from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.shfe import download_shfe_history_data
 from InvestmentWorkshop.collector.utility import (
     make_directory_existed,
-    unzip_quote_file,
+    unzip_file,
+    split_symbol,
 )
 
 
@@ -40,9 +42,9 @@ def test_make_directory_existed():
     assert test_directory.exists() is False
 
 
-def test_unzip_quote_file():
+def test_unzip_file():
     """
-    Test for <InvestmentWorkshop.collector.shfe.unzip_quote_file>.
+    Test for <InvestmentWorkshop.collector.utility.unzip_file>.
 
     :return:
     """
@@ -74,7 +76,7 @@ def test_unzip_quote_file():
     assert download_file.exists() is True
 
     # Unzip
-    file_list = unzip_quote_file(download_file)
+    file_list = unzip_file(download_file)
 
     # Test.
     assert isinstance(file_list, list)
@@ -88,3 +90,20 @@ def test_unzip_quote_file():
         assert file.exists() is False
     download_file.unlink()
     assert download_file.exists() is False
+
+
+def test_split_symbol():
+    symbol_list: List[Tuple[str, str, str]] = [
+        ('rb2201', 'rb', '2201'),
+        ('c2201', 'c', '2201'),
+        ('jm2201', 'jm', '2201'),
+        ('ap201', 'ap', '201'),
+    ]
+
+    for symbol in symbol_list:
+        result = split_symbol(symbol[0])
+        assert isinstance(result, tuple)
+        assert isinstance(result[0], str)
+        assert result[0] == symbol[1]
+        assert isinstance(result[1], str)
+        assert result[1] == symbol[2]

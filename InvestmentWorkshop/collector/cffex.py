@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Dict, Any
+from typing import List
 from pathlib import Path
 import datetime as dt
 import csv
@@ -11,7 +11,7 @@ import csv
 import requests
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed
+from .utility import make_directory_existed, QuoteDaily, split_symbol
 
 
 def download_cffex_history_data(month_required: dt.date) -> None:
@@ -72,13 +72,13 @@ def download_cffex_history_data_all() -> None:
         download_cffex_history_data(item)
 
 
-def read_cffex_history_data(csv_file: Path) -> List[Dict[str, Any]]:
+def read_cffex_history_data(csv_file: Path) -> List[QuoteDaily]:
     """
     Read quote data from file (csv).
     :param csv_file:
     :return:
     """
-    result: List[Dict[str, Any]] = []
+    result: List[QuoteDaily] = []
 
     # Handle date.
     filename: str = csv_file.name[:8]
@@ -95,10 +95,15 @@ def read_cffex_history_data(csv_file: Path) -> List[Dict[str, Any]]:
             if row['合约代码'] == '小计' or row['合约代码'] == '合计' or '-' in row['合约代码']:
                 continue
             try:
+                symbol = row['合约代码'].strip()
+                product, contract = split_symbol(symbol)
                 result.append(
                     {
+                        'exchange': 'CFFEX',
                         'date': date,
-                        'symbol': row['合约代码'].strip(),
+                        'symbol': symbol,
+                        'product': product,
+                        'contract': contract,
                         'open': float(row['今开盘']) if len(row['今开盘']) > 0 else 0.0,
                         'high': float(row['最高价']) if len(row['最高价']) > 0 else 0.0,
                         'low': float(row['最低价']) if len(row['最低价']) > 0 else 0.0,

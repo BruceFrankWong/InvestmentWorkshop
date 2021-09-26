@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Dict, Any
+from typing import List, Dict
 from pathlib import Path
 import datetime as dt
 
@@ -11,7 +11,7 @@ import requests
 from lxml import etree
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed
+from .utility import make_directory_existed, QuoteDaily, split_symbol
 
 
 CZCE_DATA_INDEX = Dict[str, Dict[int, str]]
@@ -101,10 +101,10 @@ def download_czce_history_data_all():
                 f.write(response.content)
 
 
-def read_czce_history_data(data_file: Path) -> List[Dict[str, Any]]:
+def read_czce_history_data(data_file: Path) -> List[QuoteDaily]:
     assert data_file.exists() is True
 
-    result: List[Dict[str, Any]] = []
+    result: List[QuoteDaily] = []
 
     try:
         with open(data_file, mode='r', encoding='gbk') as txt_file:
@@ -116,6 +116,7 @@ def read_czce_history_data(data_file: Path) -> List[Dict[str, Any]]:
         except UnicodeDecodeError:
             raise
 
+    year: str = data_file.stem.split('_')[-1]
     for line in lines[2:]:
         data = line.split('|')
         data = [x.strip() for x in data]
@@ -124,6 +125,8 @@ def read_czce_history_data(data_file: Path) -> List[Dict[str, Any]]:
         if 'option' in data_file.stem:
             result.append(
                 {
+                    # 交易所
+                    'exchange': 'CZCE',
                     # 交易日期
                     'date': dt.date.fromisoformat(data[0]),
                     # 合约代码
@@ -161,12 +164,19 @@ def read_czce_history_data(data_file: Path) -> List[Dict[str, Any]]:
                 }
             )
         else:
+            symbol = data[1]
+            product, contract = split_symbol(symbol)
+            contract = f'{year[2]}{contract}'
             result.append(
                 {
+                    # 交易所
+                    'exchange': 'CZCE',
                     # 交易日期
                     'date': dt.date.fromisoformat(data[0]),
                     # 合约代码
-                    'symbol': data[1],
+                    'symbol': symbol,
+                    'product': product,
+                    'contract': contract,
                     # 昨结算
                     'previous_settlement': float(data[2].replace(',', '')),
                     # 今开盘

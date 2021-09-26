@@ -13,7 +13,7 @@ __author__ = 'Bruce Frank Wong'
 """
 
 
-from typing import List, Dict, Any
+from typing import List, Dict
 from pathlib import Path
 import datetime as dt
 
@@ -21,7 +21,7 @@ import requests
 import xlrd
 
 from ..utility import CONFIGS
-from .utility import make_directory_existed
+from .utility import QuoteDaily, make_directory_existed, split_symbol
 
 
 def download_shfe_history_data(year: int):
@@ -62,13 +62,13 @@ def download_shfe_history_data_all():
         download_shfe_history_data(year)
 
 
-def read_shfe_history_data(xls_file: Path) -> List[Dict[str, Any]]:
+def read_shfe_history_data(xls_file: Path) -> List[QuoteDaily]:
     """
     Read quote data from file.
     :param xls_file: a Path-like object.
     :return: a list.
     """
-    result: List[Dict[str, Any]] = []
+    result: List[QuoteDaily] = []
 
     # Read .xls files.
     workbook = xlrd.open_workbook(xls_file)
@@ -100,9 +100,13 @@ def read_shfe_history_data(xls_file: Path) -> List[Dict[str, Any]]:
             continue
         if row[mapper['symbol']].ctype != 0:
             last_symbol = row[mapper['symbol']].value
+        product, contract = split_symbol(last_symbol)
         result.append(
             {
+                'exchange': 'SHFE',
                 'symbol': last_symbol,
+                'product': product,
+                'contract': contract,
                 'date': dt.date(
                     year=int(row[mapper['date']].value[:4]),
                     month=int(row[mapper['date']].value[4:6]),

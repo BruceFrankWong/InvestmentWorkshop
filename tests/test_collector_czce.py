@@ -11,7 +11,7 @@ import datetime as dt
 import random
 
 from InvestmentWorkshop.utility import CONFIGS
-from InvestmentWorkshop.collector.utility import unzip_quote_file
+from InvestmentWorkshop.collector.utility import unzip_file
 from InvestmentWorkshop.collector.czce import (
     fetch_czce_history_index,
     download_czce_history_data,
@@ -169,7 +169,7 @@ def test_read_czce_history_data(download_path):
     unzipped_file_list: List[Path] = []
     for download_file in download_file_list:
         assert download_file.exists() is True
-        unzipped_list = unzip_quote_file(download_file)
+        unzipped_list = unzip_file(download_file)
         if len(unzipped_list) == 1:
             unzipped_file = unzipped_list[0]
             new_name = download_path.joinpath(f'{download_file.stem}.txt')
@@ -242,6 +242,12 @@ def test_read_czce_history_data(download_path):
                 assert 'exercise' in item.keys()
                 assert isinstance(item['exercise'], int)
             else:
+                # 品种
+                assert isinstance(item['product'], str)
+                assert len(item['product']) <= 2
+                # 交割月份
+                assert isinstance(item['contract'], str)
+                assert len(item['contract']) == 4
                 # 交割结算价
                 assert 'delivery_settlement' in item.keys()
                 if item['delivery_settlement'] is not None:
