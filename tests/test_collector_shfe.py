@@ -5,158 +5,212 @@ __author__ = 'Bruce Frank Wong'
 
 import pytest
 
-from typing import List
+from typing import Dict, List, Tuple, Any
 from pathlib import Path
 import datetime as dt
-import random
+import os.path
 
-from InvestmentWorkshop.utility import CONFIGS
 from InvestmentWorkshop.collector.shfe import (
+    SHFE_HISTORY_DATA_START_YEAR,
+    check_shfe_parameter,
+    get_all_shfe_history_data_parameters,
+    get_shfe_history_data_local_filename,
     download_shfe_history_data,
-    download_shfe_history_data_all,
     read_shfe_history_data,
 )
-from InvestmentWorkshop.collector.utility import unzip_file
+from InvestmentWorkshop.collector.utility import uncompress_zip_file
 
 
-@pytest.fixture()
-def download_path() -> Path:
+@pytest.mark.parametrize(
+    'year',
+    [
+        dt.date.today().year,  # 当前测试运行时间的年、月
+        2009,   # 数据开始提供的年、月
+        2019,   # 常规日期
+        2008,   # 早于有效时间范围，应抛出异常
+        2030,   # 晚于有效时间范围，应抛出异常
+    ]
+)
+def test_check_parameter(year):
     """
-    Return download path which configured in <CONFIGS>.
-    :return: a Path-like object.
+    测试 collector.shfe.check_parameter()。
+
+    上期所的数据从2009年开始提供，至当前测试时间的年份。如果参数无效，抛出 ValueError 异常。
+
+    :param year:  int，待下载数据的年份。
+    :return: None。
     """
-    return Path(CONFIGS['path']['download'])
+    # 当前日期
+    today: dt.date = dt.date.today()
+
+    # 如果给定的年份数字超出时间范围，应该抛出异常。
+    if year < SHFE_HISTORY_DATA_START_YEAR or year > today.year:
+        with pytest.raises(ValueError):
+            check_shfe_parameter(year)
 
 
-@pytest.fixture()
-def download_year() -> int:
+def test_get_all_history_data_parameters():
     """
-    Generate a random year to download.
-    :return: int.
+    测试 collector.shfe.get_all_history_data_parameters()。
+
+    get_all_history_data_parameters() 应返回一个 list，每一项均为 int 类型，表示年份。
+
+    :return: None。
     """
-    return random.randint(2009, dt.date.today().year)
+    result = get_all_shfe_history_data_parameters()
+    assert isinstance(result, list)
+
+    # 排序
+    result.sort()
+
+    today: dt.date = dt.date.today()
+
+    assert result[0] == SHFE_HISTORY_DATA_START_YEAR
+    assert result[-1] == today.year
+    assert len(set(result)) == (today.year - SHFE_HISTORY_DATA_START_YEAR + 1)
 
 
-def test_download_shfe_history_data(download_path, download_year):
+def test_get_local_history_data_filename():
     """
-    Test for <InvestmentWorkshop.collector.shfe.download_shfe_history_data>.
+    测试 collector.shfe.get_local_history_data_filename()。
 
-    1) Assert downloading a new file succeed, if variable <year> is in range [2009, <Current-Year>].
-    2) Assert exception raised if variable <year> is in range [2009, <Current-Year>].
+    get_local_history_data_filename() 应返回一个 str，长度为 17。
+    格式为 <SHFE_{year:4d}.zip>。
 
-    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
-    :param download_year: Test fixture. A random year to download, int.
-    :return: None
+    :return: None。
     """
-
-    # Fill the variables.
-    download_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip')
-    backup_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip.backup')
-
-    # Make sure <download_file> does not exist.
-    if download_file.exists():
-        download_file.rename(backup_file)
-    assert download_file.exists() is False
-
-    # Do download and test.
-    download_shfe_history_data(download_year)
-    assert download_file.exists() is True
-
-    # Clean up and restore.
-    download_file.unlink()
-    if backup_file.exists():
-        backup_file.rename(download_file)
+    for year in get_all_shfe_history_data_parameters():
+        result = get_shfe_history_data_local_filename(year)
+        assert isinstance(result, str)
+        assert len(result) == 13
+        assert result[:5] == 'SHFE_'
+        assert result[5:9] == str(f'{year:4d}')
+        assert result[9:] == '.zip'
 
 
-def test_download_shfe_history_data_all(download_path):
+def test_download_history_data(path_for_test):
     """
-    Test for <InvestmentWorkshop.collector.shfe.download_shfe_history_data_all>.
+    测试 collector.shfe.download_history_data()。
 
-    Assert all files downloaded succeed.
+    download_history_data() 应生成命名为 <SHFE_<yyyy>.zip> 的新文件，且容量大于 0。
 
-    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
-    :return: None
+    :param path_for_test: Path，测试固件。测试期间临时文件的路径。
+    :return: None。
     """
+    for year in get_all_shfe_history_data_parameters():
+        # 应该被下载的文件。
+        file_to_be_downloaded: Path = path_for_test.joinpath(
+            get_shfe_history_data_local_filename(year)
+        )
 
-    start_year: int = 2009
-    this_year: int = dt.date.today().year
+        # 如果已经有了这个文件，删除它。
+        if file_to_be_downloaded.exists():
+            file_to_be_downloaded.unlink()
 
-    download_file_name: str = 'SHFE_{year:4d}.zip'
-    backup_file_name: str = 'SHFE_{year:4d}.zip.backup'
-    download_file_list: List[Path] = []
-    backup_file_list: List[Path] = []
+        # 确保本地不存在这个文件。
+        assert file_to_be_downloaded.exists() is False
 
-    # Generate file list, and rename the existed file.
-    for year in range(start_year, this_year + 1):
-        download_file: Path = download_path.joinpath(download_file_name.format(year=year))
-        backup_file: Path = download_path.joinpath(backup_file_name.format(year=year))
-        if download_file.exists():
-            download_file.rename(backup_file)
-            backup_file_list.append(backup_file)
-        assert download_file.exists() is False
-        download_file_list.append(download_file)
+        # 下载
+        download_shfe_history_data(path_for_test, year)
 
-    # Do download..
-    download_shfe_history_data_all()
+        # 新文件存在
+        assert file_to_be_downloaded.exists() is True
 
-    # Test and clean up.
-    for download_file in download_file_list:
-        # Test.
-        assert download_file.exists() is True
-        # Clean up
-        download_file.unlink()
+        # 新文件容量不为 0。
+        assert os.path.getsize(file_to_be_downloaded) > 0
 
-    # Restore.
-    for backup_file in backup_file_list:
-        backup_file.rename(download_path.joinpath(backup_file.stem))
+        # 清理文件。
+        file_to_be_downloaded.unlink()
+        assert file_to_be_downloaded.exists() is False
 
 
-def test_read_shfe_history_data(download_path, download_year):
+def test_read_history_data(path_for_test):
     """
-    Test for <InvestmentWorkshop.collector.shfe.read_shfe_history_data>.
+    Test for <collector.shfe.read_shfe_history_data>.
 
-    :param download_path: Test fixture. A Path-like object, where tester save downloaded files.
-    :param download_year: Test fixture. A random year to download, int.
+    :param path_for_test: Test fixture. A Path-like object, where tester save downloaded files.
     :return:
     """
-    # Download random history quote file.
-    download_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip')
-    download_shfe_history_data(download_year)
+    for year in get_all_shfe_history_data_parameters():
+        # 应该被下载的文件。
+        file_to_be_downloaded: Path = path_for_test.joinpath(
+            get_shfe_history_data_local_filename(year)
+        )
 
-    # Unzip.
-    file_list = unzip_file(download_file)
+        # 如果已经有了这个文件，删除它。
+        if file_to_be_downloaded.exists():
+            file_to_be_downloaded.unlink()
 
-    for xls_file in file_list:
-        assert xls_file.exists() is True
-        result = read_shfe_history_data(xls_file)
-        assert isinstance(result, list)
-        for item in result:
-            assert isinstance(item, dict)
-            assert isinstance(item['symbol'], str)
-            assert isinstance(item['product'], str)
-            assert len(item['product']) <= 2
-            assert isinstance(item['contract'], str)
-            assert len(item['contract']) == 4
-            assert isinstance(item['date'], dt.date)
-            assert isinstance(item['previous_close'], float)
-            assert isinstance(item['previous_settlement'], float)
-            if item['open'] is not None:
-                assert isinstance(item['open'], float)
-            if item['high'] is not None:
-                assert isinstance(item['high'], float)
-            if item['low'] is not None:
-                assert isinstance(item['low'], float)
-            assert isinstance(item['close'], float)
-            assert isinstance(item['settlement'], float)
-            assert isinstance(item['change_on_close'], float)
-            assert isinstance(item['change_on_settlement'], float)
-            assert isinstance(item['volume'], int)
-            assert isinstance(item['amount'], float)
-            assert isinstance(item['open_interest'], int)
+        # 确保本地不存在这个文件。
+        assert file_to_be_downloaded.exists() is False
 
-        # Make clean.
-        xls_file.unlink()
-        assert xls_file.exists() is False
+        # 下载
+        download_shfe_history_data(path_for_test, year)
 
-    download_file.unlink()
-    assert download_file.exists() is False
+        # Unzip.
+        file_list = uncompress_zip_file(file_to_be_downloaded, path_for_test)
+
+        for xls_file in file_list:
+            assert xls_file.exists() is True
+            result: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]] = read_shfe_history_data(xls_file)
+            assert isinstance(result, tuple)
+
+            # 转写变量
+            date_futures: List[Dict[str, Any]] = result[0]
+            date_option: List[Dict[str, Any]] = result[1]
+
+            for item in date_futures:
+                assert isinstance(item, dict)
+                assert isinstance(item['symbol'], str)
+                assert isinstance(item['product'], str)
+                assert len(item['product']) <= 2
+                assert isinstance(item['expiration'], str)
+                assert len(item['expiration']) == 4
+                assert isinstance(item['date'], dt.date)
+                assert isinstance(item['previous_close'], float)
+                assert isinstance(item['previous_settlement'], float)
+                if item['open'] is not None:
+                    assert isinstance(item['open'], float)
+                if item['high'] is not None:
+                    assert isinstance(item['high'], float)
+                if item['low'] is not None:
+                    assert isinstance(item['low'], float)
+                assert isinstance(item['close'], float)
+                assert isinstance(item['settlement'], float)
+                assert isinstance(item['change_on_close'], float)
+                assert isinstance(item['change_on_settlement'], float)
+                assert isinstance(item['volume'], int)
+                assert isinstance(item['amount'], float)
+                assert isinstance(item['open_interest'], int)
+
+            for item in date_option:
+                assert isinstance(item, dict)
+                assert isinstance(item['symbol'], str)
+                assert isinstance(item['product'], str)
+                assert len(item['product']) <= 2
+                assert isinstance(item['expiration'], str)
+                assert len(item['expiration']) == 4
+                assert isinstance(item['offset'], str)
+                assert isinstance(item['exercise_price'], str)
+                assert isinstance(item['date'], dt.date)
+                assert isinstance(item['previous_close'], float)
+                assert isinstance(item['previous_settlement'], float)
+                if item['open'] is not None:
+                    assert isinstance(item['open'], float)
+                if item['high'] is not None:
+                    assert isinstance(item['high'], float)
+                if item['low'] is not None:
+                    assert isinstance(item['low'], float)
+                assert isinstance(item['close'], float)
+                assert isinstance(item['settlement'], float)
+                assert isinstance(item['change_on_close'], float)
+                assert isinstance(item['change_on_settlement'], float)
+                assert isinstance(item['volume'], int)
+                assert isinstance(item['amount'], float)
+                assert isinstance(item['open_interest'], int)
+
+            # Make clean.
+            xls_file.unlink()
+            assert xls_file.exists() is False
+
+        assert file_to_be_downloaded.exists() is False
