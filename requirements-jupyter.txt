@@ -1,0 +1,3 @@
+-r requirements-python.txt
+jupyterlab
+ipytest
