@@ -142,3 +142,6 @@ temp/
 
 # Big csv file
 data/*.csv
+
+# output files
+/RESULT/*
