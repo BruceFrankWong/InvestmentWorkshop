@@ -144,5 +144,4 @@ temp/
 data/*.csv
 
 # output files
-/RESULT/*
-/RESULT/*/*
+RESULT/
