@@ -3,107 +3,148 @@
 __author__ = 'Bruce Frank Wong'
 
 
+import pytest
+
 from typing import List, Tuple
 from pathlib import Path
-import random
-import datetime as dt
 
-from InvestmentWorkshop.utility import CONFIGS
-from InvestmentWorkshop.collector.shfe import download_shfe_history_data
 from InvestmentWorkshop.collector.utility import (
-    make_directory_existed,
-    unzip_file,
+    uncompress_zip_file,
     split_symbol,
+)
+from InvestmentWorkshop.collector.cffex import (
+    CFFEX_PATTERN_FUTURES,
+    CFFEX_PATTERN_OPTION,
+    get_all_cffex_history_data_parameters,
+    get_cffex_history_data_local_filename,
+    download_cffex_history_data,
+)
+from InvestmentWorkshop.collector.shfe import (
+    SHFE_PATTERN_FUTURES,
+    SHFE_PATTERN_OPTION,
+    get_all_shfe_history_data_parameters,
+    get_shfe_history_data_local_filename,
+    download_shfe_history_data,
 )
 
 
-def test_make_directory_existed():
+@pytest.mark.parametrize(
+    'symbol, pattern, should_be',
+    [
+        ('IF2112', CFFEX_PATTERN_FUTURES, ('IF', '2112')),     # 中金所，期货
+        ('T2012',  CFFEX_PATTERN_FUTURES, ('T',  '2012')),     # 中金所，期货
+        ('IO2004-P-3700', CFFEX_PATTERN_OPTION, ('IO', '2004', 'P', '3700')),   # 中金所，期权
+
+        ('cu1806', SHFE_PATTERN_FUTURES, ('cu', '1806')),     # 上期所，期货
+        ('rb1907', SHFE_PATTERN_FUTURES, ('rb', '1907')),     # 上期所，期货
+        ('cu1912C49000', SHFE_PATTERN_OPTION, ('cu', '1912', 'C', '49000')),   # 上期所，期权
+    ]
+)
+def test_split_symbol(symbol: str, pattern: str, should_be: tuple):
     """
-    Test for <make_directory_existed>.
-    :return: None.
-    """
-    test_directory: Path = Path('E:\\Temporary')
+    将代码分解为品种、到期年月、方向（期权）和行权价（期权）。
 
-    # Make sure <test_directory> not existed.
-    if test_directory.exists():
-        # Remove files in <test_directory> if existed.
-        [file.unlink() for file in test_directory.iterdir()]
-        test_directory.rmdir()
-    assert test_directory.exists() is False
-
-    # Run <make_directory_existed>.
-    make_directory_existed(test_directory)
-
-    # Test.
-    assert test_directory.exists() is True
-
-    # Make clean.
-    test_directory.rmdir()
-    assert test_directory.exists() is False
-
-
-def test_unzip_file():
-    """
-    Test for <InvestmentWorkshop.collector.utility.unzip_file>.
-
+    :param symbol: str，交易代码。
+    :param pattern: str，用于分解交易代码的正则表达式。
+    :param should_be: tuple，预计的结果。
     :return:
     """
-    # Fill the variables.
-    download_path: Path = Path(CONFIGS['path']['download'])
-    unzip_directory: Path = download_path.joinpath('unzip')
-
-    # ------------------------------------------------------------
-    # Test with zip file from SHFE.
-    # ------------------------------------------------------------
-    download_year: int = random.randint(2009, dt.date.today().year)
-    download_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip')
-    backup_file: Path = download_path.joinpath(f'SHFE_{download_year:4d}.zip.backup')
-
-    # Make sure <download_file> does not exist.
-    if download_file.exists():
-        download_file.rename(backup_file)
-    assert download_file.exists() is False
-
-    # make sure <unzip_directory> existed and empty.
-    if unzip_directory.exists():
-        [file.unlink() for file in unzip_directory.iterdir()]
-    else:
-        unzip_directory.mkdir()
-    assert unzip_directory.exists() is True
-
-    # Download from SHFE.
-    download_shfe_history_data(download_year)
-    assert download_file.exists() is True
-
-    # Unzip
-    file_list = unzip_file(download_file)
-
-    # Test.
-    assert isinstance(file_list, list)
-    for file in file_list:
-        assert isinstance(file, Path)
-        assert file.exists() is True
-
-    # Make clean up.
-    for file in file_list:
-        file.unlink()
-        assert file.exists() is False
-    download_file.unlink()
-    assert download_file.exists() is False
+    result = split_symbol(symbol, pattern)
+    assert len(result) == len(should_be)
+    for i in range(len(result)):
+        assert result[i] == should_be[i]
 
 
-def test_split_symbol():
-    symbol_list: List[Tuple[str, str, str]] = [
-        ('rb2201', 'rb', '2201'),
-        ('c2201', 'c', '2201'),
-        ('jm2201', 'jm', '2201'),
-        ('ap201', 'ap', '201'),
-    ]
+def test_uncompress_zip_file_with_cffex(path_for_test):
+    """
+    Test for <collector.utility.uncompress_zip_file()>, with CFFEX。
+    :param path_for_test: Path，测试固件。测试期间临时文件的路径。
+    :return:
+    """
+    # 用中金所数据进行测试。
+    parameter_list: List[Tuple[int, int]] = get_all_cffex_history_data_parameters()
 
-    for symbol in symbol_list:
-        result = split_symbol(symbol[0])
-        assert isinstance(result, tuple)
-        assert isinstance(result[0], str)
-        assert result[0] == symbol[1]
-        assert isinstance(result[1], str)
-        assert result[1] == symbol[2]
+    for parameter in parameter_list:
+        # 转写参数。
+        year: int = parameter[0]
+        month: int = parameter[1]
+
+        # 待下载文件的本地路径。
+        download_file: Path = path_for_test.joinpath(
+            get_cffex_history_data_local_filename(year, month)
+        )
+
+        # 确认待下载文件不存在。
+        if download_file.exists():
+            download_file.unlink()
+        assert download_file.exists() is False
+
+        # 下载。
+        download_cffex_history_data(path_for_test, year, month)
+
+        # 确认文件存在。
+        assert download_file.exists() is True
+
+        # 解压缩。
+        file_list = uncompress_zip_file(download_file, path_for_test)
+
+        # 测试
+        # 确认文件被删除。
+        assert download_file.exists() is False
+
+        # Test.
+        assert isinstance(file_list, list)
+        for file in file_list:
+            assert isinstance(file, Path)
+            assert file.exists() is True
+
+        # 清理
+        for file in file_list:
+            file.unlink()
+            assert file.exists() is False
+
+
+def test_uncompress_zip_file_with_shfe(path_for_test):
+    """
+    Test for <collector.utility.uncompress_zip_file()>, with SHFE。
+    :param path_for_test: Path，测试固件。测试期间临时文件的路径。
+    :return:
+    """
+    # 用上期所数据进行测试。
+    parameter_list: List[int] = get_all_shfe_history_data_parameters()
+
+    for year in parameter_list:
+
+        # 待下载文件的本地路径。
+        download_file: Path = path_for_test.joinpath(
+            get_shfe_history_data_local_filename(year)
+        )
+
+        # 确认待下载文件不存在。
+        if download_file.exists():
+            download_file.unlink()
+        assert download_file.exists() is False
+
+        # 下载。
+        download_shfe_history_data(path_for_test, year)
+
+        # 确认文件存在。
+        assert download_file.exists() is True
+
+        # 解压缩。
+        file_list = uncompress_zip_file(download_file, path_for_test)
+
+        # 测试
+        # 确认文件被删除。
+        assert download_file.exists() is False
+
+        # Test.
+        assert isinstance(file_list, list)
+        for file in file_list:
+            assert isinstance(file, Path)
+            assert file.exists() is True
+
+        # 清理
+        for file in file_list:
+            file.unlink()
+            assert file.exists() is False

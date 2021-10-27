@@ -3,25 +3,55 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Dict
+from typing import Dict, List, Tuple
 from pathlib import Path
 import datetime as dt
 
 import requests
 from lxml import etree
 
-from ..utility import CONFIGS
-from .utility import make_directory_existed, QuoteDaily, split_symbol
+from .utility import QuoteDaily, split_symbol, QuoteType
 
 
-CZCE_DATA_INDEX = Dict[str, Dict[int, str]]
+CZCE_FUTURES_HISTORY_DATA_START_YEAR: int = 2010
+CZCE_OPTION_HISTORY_DATA_START_YEAR: int = 2017
+
+CZCE_DATA_INDEX = Tuple[Dict[int, str], Dict[int, str]]
 
 
-def fetch_czce_history_index() -> Dict[str, Dict[int, str]]:
-    result: Dict[str, Dict[int, str]] = {
-        'futures': {},
-        'option': {},
-    }
+def check_czce_parameter(year: int, type_: QuoteType) -> None:
+    """
+    校验参数<year>（年份）、<month>（月份）的有效性，无效抛出异常。
+
+    :param year:  int，年份。
+    :param type_:  QuoteType, 数据类型。
+    :return:
+    """
+    # 今天的日期。
+    today: dt.date = dt.date.today()
+
+    # 如果 <year> 晚于当前年份，抛出异常。
+    if year > today.year:
+        raise ValueError(f'{year:4d}年是未来日期。')
+
+    if type_ == QuoteType.Stock:
+        raise ValueError(f'郑商所不支持股票交易。')
+    elif type_ == QuoteType.Futures:
+        # 如果 <type_> 是 <QuoteType.Futures> 且 <year> 早于 CZCE_FUTURES_HISTORY_DATA_START_YEAR，抛出异常。
+        if year < CZCE_FUTURES_HISTORY_DATA_START_YEAR:
+            raise ValueError(f'郑商所期货历史数据自{CZCE_FUTURES_HISTORY_DATA_START_YEAR:4d}年起开始提供。')
+    elif type_ == QuoteType.Option:
+        # 如果 <type_> 是 <QuoteType.Option> 且 <year> 早于 CZCE_OPTION_HISTORY_DATA_START_YEAR，抛出异常。
+        if year < CZCE_OPTION_HISTORY_DATA_START_YEAR:
+            raise ValueError(f'郑商所期权历史数据自{CZCE_OPTION_HISTORY_DATA_START_YEAR:4d}年起开始提供。')
+    else:
+        raise ValueError(f'未知行情类型。')
+
+
+def fetch_czce_history_index() -> CZCE_DATA_INDEX:
+    result_futures: Dict[int, str] = {}
+    result_option: Dict[int, str] = {}
+
     url_czce: str = 'http://www.czce.com.cn'
     url: str = f'{url_czce}/cn/jysj/lshqxz/H770319index_1.htm'
 
@@ -47,58 +77,51 @@ def fetch_czce_history_index() -> Dict[str, Dict[int, str]]:
     for i in range(len(url_list)):
         year = int(year_list[i][:4])
         if 'Option' in url_list[i]:
-            result['option'][year] = f'{url_czce}{url_list[i]}'
+            result_option[year] = f'{url_czce}{url_list[i]}'
         else:
-            result['futures'][year] = f'{url_czce}{url_list[i]}'
-    return result
+            result_futures[year] = f'{url_czce}{url_list[i]}'
+    return result_futures, result_option
 
 
-def download_czce_history_data(year: int, type_: str = 'futures'):
+def get_czce_history_data_local_filename(year: int, type_: QuoteType) -> str:
+    """
+    返回郑商所历史数据文件的本地文件名字符串，避免在项目各处硬编码历史数据文件名（或文件名模板）。
+
+    参数<year>（年份）、<month>（月份）会经过校验，不再有效范围中将抛出异常。
+
+    :param year:  int, 数据年份。
+    :param type_:  QuoteType, 数据类型。
+    :return: str, local filename.
+    """
+    # 确认参数有效。
+    check_czce_parameter(year=year, type_=type_)
+    return f'CZCE_{type_.value}_{year:4d}.zip'
+
+
+def download_czce_history_data(save_path: Path, year: int, type_: QuoteType):
     # Parameters handle.
-    url_mapper: CZCE_DATA_INDEX = fetch_czce_history_index()
-    url_list: Dict[int, str]
-    if type_ == 'futures':
-        url_list = url_mapper['futures']
-    elif type_ == 'option':
-        url_list = url_mapper['option']
-    else:
-        raise ValueError('<type_> should be "Futures" or "Option".')
+    url_list = fetch_czce_history_index()
 
-    if year not in url_list.keys():
-        raise ValueError('<year> is beyond possible range.')
+    # 确认参数有效。
+    check_czce_parameter(year=year, type_=type_)
 
-    # Make sure <download_path> existed.
-    download_path: Path = Path(CONFIGS['path']['download'])
-    make_directory_existed(download_path)
+    # 如果参数 <save_path> 不存在，引发异常。
+    if not save_path.exists():
+        raise FileNotFoundError(f'目录 {save_path} 不存在。')
 
     # Download index page.
-    url: str = url_list[year]
+    if type_ == QuoteType.Futures:
+        url: str = url_list[0][year]
+    else:
+        url: str = url_list[1][year]
+
     response = requests.get(url)
     if response.status_code != 200:
-        raise requests.exceptions.HTTPError(f'Error in downloading <{url.format(year=year)}>.')
-    with open(download_path.joinpath(f'CZCE_{type_}_{year:4d}.zip'), 'wb') as f:
+        raise requests.exceptions.HTTPError(f'下载 <{url}> 时发生错误。')
+    with open(save_path.joinpath(
+            get_czce_history_data_local_filename(year=year, type_=type_)
+    ), 'wb') as f:
         f.write(response.content)
-
-
-def download_czce_history_data_all():
-    # Make sure <download_path> existed.
-    download_path: Path = Path(CONFIGS['path']['download'])
-    make_directory_existed(download_path)
-
-    # Parameters handle.
-    url_mapper: CZCE_DATA_INDEX = fetch_czce_history_index()
-    url_list: Dict[int, str]
-    type_list: List[str] = ['futures', 'option']
-    for type_ in type_list:
-        url_list = url_mapper[type_]
-        for year in url_list.keys():
-            url = url_list[year]
-            # Download index page.
-            response = requests.get(url)
-            if response.status_code != 200:
-                raise requests.exceptions.HTTPError(f'Error in downloading <{url.format(year=year)}>.')
-            with open(download_path.joinpath(f'CZCE_{type_}_{year:4d}.zip'), 'wb') as f:
-                f.write(response.content)
 
 
 def read_czce_history_data(data_file: Path) -> List[QuoteDaily]:

@@ -10,27 +10,12 @@ from pathlib import Path
 import datetime as dt
 import random
 
-from InvestmentWorkshop.utility import CONFIGS
-from InvestmentWorkshop.collector.utility import unzip_file
+from InvestmentWorkshop.collector.utility import uncompress_zip_file
 from InvestmentWorkshop.collector.czce import (
     fetch_czce_history_index,
     download_czce_history_data,
-    download_czce_history_data_all,
     read_czce_history_data,
 )
-
-
-@pytest.fixture()
-def download_path() -> Path:
-    """
-    Return download path which configured in <CONFIGS>.
-    :return: a Path-like object.
-    """
-    # Make sure the path existed.
-    test_path: Path = Path(CONFIGS['path']['download'])
-    if not test_path.exists():
-        test_path.mkdir()
-    return test_path
 
 
 @pytest.fixture()
@@ -93,9 +78,9 @@ def test_fetch_czce_history_index():
             assert isinstance(v2, str)
 
 
-def test_download_czce_history_data(download_path, download_year_futures, download_year_option):
+def test_download_czce_history_data(path_for_test, download_year_futures, download_year_option):
     # Futures.
-    download_file: Path = download_path.joinpath(f'CZCE_futures_{download_year_futures:4d}.zip')
+    download_file: Path = path_for_test.joinpath(f'CZCE_futures_{download_year_futures:4d}.zip')
 
     # Make sure <download_file_list> not existed.
     if download_file.exists():
@@ -111,7 +96,7 @@ def test_download_czce_history_data(download_path, download_year_futures, downlo
     assert download_file.exists() is False
 
     # Option.
-    download_file: Path = download_path.joinpath(f'CZCE_option_{download_year_option:4d}.zip')
+    download_file: Path = path_for_test.joinpath(f'CZCE_option_{download_year_option:4d}.zip')
 
     # Make sure <download_file_list> not existed.
     if download_file.exists():
@@ -169,7 +154,7 @@ def test_read_czce_history_data(download_path):
     unzipped_file_list: List[Path] = []
     for download_file in download_file_list:
         assert download_file.exists() is True
-        unzipped_list = unzip_file(download_file)
+        unzipped_list = uncompress_zip_file(download_file)
         if len(unzipped_list) == 1:
             unzipped_file = unzipped_list[0]
             new_name = download_path.joinpath(f'{download_file.stem}.txt')

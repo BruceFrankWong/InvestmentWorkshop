@@ -3,12 +3,12 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Sequence
 from pathlib import Path
-import zipfile
 from enum import Enum
+import zipfile
+import re
 
-from ..utility import CONFIGS
 from ..database import db, FuturesQuoteDaily
 
 
@@ -21,51 +21,56 @@ class QuoteType(Enum):
     Option = 'Option'
 
 
-def make_directory_existed(directory: Path) -> None:
+def uncompress_zip_file(zipped_file: Path, unzip_path: Path, keep: bool = False) -> List[Path]:
     """
-    Make sure <directory> is existed.
-    :param directory: a Path-like object.
-    :return: None
+    解压单个 zip 文件。
+
+    :param zipped_file: Path，待解压文件的路径。
+    :param unzip_path:  Path，保存被解压出来的文件的路径。
+    :param keep:        bool，取值 True 意味着保留待解压文件的话，否则解压完成后删除待解压文件。
+    :return:            list，被解压出来的文件的路径（Path）的列表。
     """
-    if not directory.exists():
-        directory.mkdir()
+    # 如果参数 <zipped_file> 不存在，引发异常。
+    if not zipped_file.exists():
+        raise FileNotFoundError(f'<{zipped_file}> 不存在。')
 
+    # 如果参数 <unzip_path> 不存在，引发异常。
+    if not unzip_path.exists():
+        raise FileNotFoundError(f'<{unzip_path}> 不存在。')
 
-def unzip_file(zip_file: Path) -> List[Path]:
-    """
-    Unzip a zip file to ten temporary directory defined in <CONFIGS>, and return the unzipped file path.
-    :param zip_file:
-    :return: a generator.
-    """
-    result: List[Path] = []
-    if not zip_file.exists():
-        raise FileNotFoundError('<f> not found.')
+    # 用 zipfile 模块的 ZipFile 打开待解压文件。
+    zip_file = zipfile.ZipFile(zipped_file, 'r')
 
-    unzip_directory: Path = Path(CONFIGS['path']['temp'])
-    make_directory_existed(unzip_directory)
+    # 生成解压文件列表
+    result: List[Path] = [unzip_path.joinpath(filename) for filename in zip_file.namelist()]
 
-    # Unzip files.
-    zip_file = zipfile.ZipFile(zip_file, 'r')
-    zip_file.extractall(unzip_directory)
+    # 解压文件。
+    zip_file.extractall(unzip_path)
 
-    # Change names with corrected coding.
-    unzipped_file: Path
-    correct_filename: Path
-    for filename in zip_file.namelist():
-        unzipped_file = unzip_directory.joinpath(filename)
-        correct_filename = unzip_directory.joinpath(filename.encode('CP437').decode('GBK'))
-        unzipped_file.rename(correct_filename)
-        result.append(correct_filename)
+    # 关闭文件。
+    zip_file.close()
 
+    # 删除待解压文件
+    if not keep:
+        zipped_file.unlink()
+
+    # 返回解压出来的文件列表
     return result
 
 
-def split_symbol(symbol: str) -> Tuple[str, str]:
-    digital_list: List[str] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ]
-    if symbol[1] in digital_list:
-        return symbol[0], symbol[1:]
+def split_symbol(symbol: str, pattern: str) -> Optional[Sequence[str]]:
+    """
+    将代码分解为品种、到期年月、方向（期权）和行权价（期权）。
+
+    :param symbol: str，交易代码。
+    :param pattern: str，用于分解交易代码的正则表达式。
+    :return:
+    """
+    result = re.match(pattern, symbol)
+    if result:
+        return result.groups()
     else:
-        return symbol[:2], symbol[2:]
+        return None
 
 
 def write_to_database(quote: List[QuoteDaily], type_: QuoteType):
