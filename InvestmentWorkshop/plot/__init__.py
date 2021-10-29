@@ -8,6 +8,6 @@ __author__ = 'Bruce Frank Wong'
 """
 
 
-from .plot_with_mplfinance import (
+from .plot_theory_of_chan import (
     plot_merged_candlestick,
 )

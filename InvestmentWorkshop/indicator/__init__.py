@@ -10,7 +10,10 @@ from .ma import (
 from .pbx import pbx
 from .boll import boll
 from .chan import (
-    chan_on_bar_dataframe,
-    plot_chan_dataframe,
-    chan_on_bar,
+    theory_of_chan,
+    plot_theory_of_chan,
+)
+from .chan2 import (
+    theory_of_chan_2,
+    plot_theory_of_chan_2,
 )

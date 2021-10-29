@@ -1,21 +1,21 @@
-# -*- coding: utf-8 -*-
+# -*- coding: UTF-8 -*-
 
 __author__ = 'Bruce Frank Wong'
+
 
 """
 
     Chan Theory
-
+    
         Record data with pandas DataFrame, and align with common candlestick DataFrame.
 
 """
 
 
-from typing import Dict, List, Tuple, Any, Sequence
+from typing import Dict, List, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
 import datetime as dt
-from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -24,31 +24,21 @@ from matplotlib.collections import PatchCollection
 import mplfinance as mpf
 
 
-PriceRange = Tuple[float, float]
-
-
 @dataclass
-class CandlestickOrdinary:
+class ChanCandlestick:
     high: float
     low: float
 
 
-@dataclass
-class CandlestickChan(CandlestickOrdinary):
-    period: int
-    first: int
-    last: int
-
-
-class Fractal(Enum):
+class ChanFractal(Enum):
     Top = '顶分型'
     Bottom = '底分型'
 
 
-def is_inclusive_number(c_h: float,
-                        c_l: float,
-                        p_h: float,
-                        p_l: float) -> bool:
+def is_inclusive(c_h: float,
+                 c_l: float,
+                 p_h: float,
+                 p_l: float) -> bool:
     """
     判断两根K线是否存在包含关系。两根K线的关系有以下九种：
         1. H1 > H2 & L1 > L2, 非包含，下降。
@@ -75,195 +65,9 @@ def is_inclusive_number(c_h: float,
         return True
 
 
-def is_inclusive_candle(candle_1: CandlestickOrdinary,
-                        candle_2: CandlestickOrdinary
-                        ) -> bool:
-    """
-    判断两根K线是否存在包含关系。两根K线的关系有以下九种：
-        1. H1 > H2 & L1 > L2, 非包含，下降。
-        2. H1 > H2 & L1 = L2, 包含, K1包含K2, 下降。
-        3. H1 > H2 & L1 < L2, 包含。
-        4. H1 = H2 & L1 > L2, 包含。
-        5. H1 = H2 & L1 = L2, 包含。
-        6. H1 = H2 & L1 < L2, 包含。
-        7. H1 < H2 & L1 > L2, 包含。
-        8. H1 < H2 & L1 = L2, 包含。
-        9. H1 < H2 & L1 < L2, 非包含, 。
-
-    :param candle_1: CandlestickOrdinary, candlestick 1.
-    :param candle_2: CandlestickOrdinary, candlestick 2.
-
-    ----
-    :return: bool, if
-    """
-    if (
-            (candle_1.high > candle_2.high and candle_1.low > candle_2.low) or
-            (candle_1.high < candle_2.high and candle_1.low < candle_2.low)
-    ):
-        return False
-    else:
-        return True
-
-
-def merge_candlestick(candlestick_chan: List[CandlestickChan],
-                      candlestick_ordinary: CandlestickOrdinary
-                      ) -> List[CandlestickChan]:
-    """
-    合并K线。
-    """
-
-    result: List[CandlestickChan] = deepcopy(candlestick_chan)
-
-    # 本普通K线与前缠论K线之间，不存在包含关系：
-    if not is_inclusive_number(
-            candlestick_chan[-1].high,
-            candlestick_chan[-1].low,
-            candlestick_ordinary.high,
-            candlestick_ordinary.low):
-
-        # 新的缠论K线，高点 = 普通K线高点，低点 = 普通K线低点，周期 = 1，。
-        new_candlestick: CandlestickChan = CandlestickChan(
-            high=candlestick_ordinary.high,
-            low=candlestick_ordinary.low,
-            period=1,
-            first=candlestick_chan[-1].last + 1,
-            last=candlestick_chan[-1].last + 1
-        )
-
-        result.append(new_candlestick)
-
-    # 如果存在包含：
-    else:
-        # 前1缠论K线的周期 + 1。
-        candlestick_chan[-1].period += 1
-
-        # 前1缠论K线所合并的普通K线，其末根的 idx。
-        candlestick_chan[-1].last += 1
-
-        # 前1缠论K线所合并的普通K线，其第一根的序号为0（从序号 0 开始的普通K线都被合并了），取前1缠论K线和本普通K线的最大范围。
-        if candlestick_chan[-1].first == 0:
-            candlestick_chan[-1].high = max(
-                candlestick_chan[-1].high,
-                candlestick_ordinary.high
-            )
-            candlestick_chan[-1].high = min(
-                candlestick_chan[-1].low,
-                candlestick_ordinary.low
-            )
-        # 前1缠论K线不是第一根缠论K线，判断前1缠论K线和前2缠论K线的方向。
-        else:
-
-            # 如果：
-            #     前1缠论K线 与 前2缠论K线： 高点 > 高点 且 低点 > 低点，
-            # 合并取 高-高。
-            if (
-                    candlestick_chan[-1].high > candlestick_chan[-2].high and
-                    candlestick_chan[-1].low > candlestick_chan[-2].low
-            ):
-                candlestick_chan[-1].high = max(
-                    candlestick_chan[-1].high,
-                    candlestick_ordinary.high
-                )
-                candlestick_chan[-1].low = max(
-                    candlestick_chan[-1].low,
-                    candlestick_ordinary.low
-                )
-
-            # 如果：
-            #     前1缠论K线 与 前2缠论K线： 高点 > 高点 且 低点 > 低点，
-            # 合并取 低-低。
-            elif (
-                    candlestick_chan[-1].high < candlestick_chan[-2].high and
-                    candlestick_chan[-1].low < candlestick_chan[-2].low
-            ):
-                candlestick_chan[-1].high = min(
-                    candlestick_chan[-1].high,
-                    candlestick_ordinary.high
-                )
-                candlestick_chan[-1].low = min(
-                    candlestick_chan[-1].low,
-                    candlestick_ordinary.low
-                )
-
-            # 其它情况判定为出错。
-            else:
-                print(
-                    f'【ERROR】在合并K线时发生错误——未知的前K与前前K高低关系。\n'
-                    f'前1高：{candlestick_chan[-1].high}，前2高：{candlestick_chan[-2].high}；\n'
-                    f'前1低：{candlestick_chan[-1].low}，前2低：{candlestick_chan[-2].low}。'
-                )
-
-    # 返回新的缠论K线。
-    return result
-
-
-def print_debug_before(idx: int,
-                       count: int,
-                       candle_1: CandlestickOrdinary,
-                       candle_2: CandlestickOrdinary) -> None:
-    """
-    Print information before processing each turn.
-    :return:
-    """
-
-    width: int = len(str(count)) + 1
-    msg_1: str = '%:>*'.format(width, idx)
-    msg_2: str = '%:>*'.format(width, count)
-
-    print(
-        f'第 {msg_1} / {msg_2} （普通K线）轮：\n'
-        f'    前K线（缠论K线）：idx = {idx - 1}, '
-        f'高点 = {candle_1.high}, '
-        f'低点 = {candle_1.low}\n'
-        f'    本K线（普通K线）：idx = {idx}, '
-        f'高点 = {candle_2.high}, '
-        f'低点 = {candle_2.low}\n'
-    )
-
-
-def print_debug_after(candlestick_chan: List[CandlestickChan],
-                      base_time: dt.datetime) -> None:
-    """
-    Print information after processing each turn.
-
-    :param candlestick_chan:
-    :param base_time:
-    :return:
-    """
-    time_current: dt.datetime = dt.datetime.now()
-
-    relation = '包含' if is_inclusive_candle(candlestick_chan[-1], candlestick_chan[-2]) else '非'
-    count: int = len(candlestick_chan)
-    print(f'    【本轮处理完毕】，用时 {time_current - base_time}。')
-    print(f'\n')
-    print(f'    K线关系：{relation}\n')
-    print(f'    K线数量：{count}，')
-    print(f'缠论高点：{candlestick_chan[-1].high}，')
-    print(f'缠论低点：{candlestick_chan[-1].low}。')
-    print(f'\n')
-    print(
-        f'    前1缠论K线：（首根）{candlestick_chan[-1].first} ～ （末根）{candlestick_chan[-1].last}，'
-        f'周期：{candlestick_chan[-1].period}；'
-    )
-    if count >= 2:
-        print(
-            f'    前2缠论K线：（首根）{candlestick_chan[-2].first} ～ （末根）{candlestick_chan[-2].last}，'
-            f'周期：{candlestick_chan[-2].period}；'
-        )
-    else:
-        print('    前3缠论K线：  不存在；')
-    if count >= 3:
-        print(
-            f'    前3缠论K线：（首根）{candlestick_chan[-3].first} ～ （末根）{candlestick_chan[-3].last}，'
-            f'周期：{candlestick_chan[-3].period}。'
-        )
-    else:
-        print('    前3缠论K线：  不存在。')
-
-
 def theory_of_chan(df_origin: pd.DataFrame,
                    count: int = None,
-                   debug: bool = False) -> List[CandlestickChan]:
+                   debug: bool = False) -> pd.DataFrame:
     """
     处理K线合并。
 
@@ -275,50 +79,416 @@ def theory_of_chan(df_origin: pd.DataFrame,
     :return:
     """
 
+    def print_debug_before():
+        """
+        Print information before processing each turn.
+        :return:
+        """
+        print(
+            f"第 {idx:>4} / {count:>4} （普通K线）轮：\n"
+            f"    前K线（缠论K线）：idx = {idx - 1}, "
+            f"高点 = {chan_p1_h}, "
+            f"低点 = {chan_p1_l}\n"
+            f"    本K线（普通K线）：idx = {idx}, "
+            f"高点 = {current_h}, "
+            f"低点 = {current_l}\n"
+        )
+
+    def print_debug_after():
+        """
+        Print information after processing each turn.
+        :return:
+        """
+        time_current: dt.datetime = dt.datetime.now()
+        if idx_candle_p2_last == -1:
+            period_p2 = '不存在'
+        else:
+            period_p2 = df_chan.loc[idx_candle_p2_last, '周期']
+
+        relation = '包含' if df_chan.loc[idx, '包含？'] else '非'
+        print(
+            f"    【本轮处理完毕】，费时 {time_current - time_start}。\n\n"
+            f"    K线关系：{relation}\n"
+            f"    K线数量：{df_chan.loc[idx, 'K线数量']}，"
+            f"缠论高点：{df_chan.loc[idx, '高点']}，"
+            f"缠论低点：{df_chan.loc[idx, '低点']}，\n"
+            f"    前1缠论K线：（首根）{idx_candle_p1_first} ～ （末根）{idx_candle_p1_last}，"
+            f"周期：{df_chan.loc[idx_candle_p1_last, '周期']}；\n"
+            f"    前2缠论K线：（首根）{idx_candle_p2_first} ～ （末根）{idx_candle_p2_last}，"
+            f"周期：{period_p2}；\n"
+            f"    前3缠论K线：（首根）{idx_candle_p3_first} ～ （末根）{idx_candle_p3_last}。\n"
+        )
+
+    def calculate_chan_candlestick_idx(p1_last: int) -> Tuple[int, int, int, int, int]:
+        """
+        计算缠论K线与普通K线的 idx 折算。
+        :return:
+        """
+        # 前1缠论K线合并的普通K线，其首根的 idx。
+        p1_first: int = p1_last - (df_chan.loc[p1_last, '周期'] - 1)
+
+        # 前2缠论K线合并的普通K线，其末根的 idx。
+        p2_last: int = p1_first - 1
+
+        # 前2缠论K线合并的普通K线，其首根的 idx。
+        p2_first: int = p2_last - (df_chan.loc[p2_last, '周期'] - 1) if p2_last > -1 else -1
+
+        # 前3缠论K线合并的普通K线，其末根的 idx。
+        p3_last: int = p2_first - 1
+
+        # 前3缠论K线合并的普通K线，其末根的 idx。
+        p3_first: int = p3_last - (df_chan.loc[p3_last, '周期'] - 1) if p3_last > -1 else -1
+
+        return p1_first, p2_last, p2_first, p3_last, p3_first
+
+    def is_fractal(candlesticks: List[ChanCandlestick]) -> bool:
+        """
+        是否缠论分型。
+        :return:
+        """
+        pass
+
     # 计时
     time_start: dt.datetime = dt.datetime.now()
 
     # ----------------------------------------
+    # 检验参数有效性。
+    # ----------------------------------------
+    assert isinstance(df_origin, pd.DataFrame)
+    if count is None or count > len(df_origin):
+        count = len(df_origin)
+
+    # ----------------------------------------
     # 声明变量类型。
     # ----------------------------------------
-    candlestick_ordinary: CandlestickOrdinary
-    candlestick_chan: List[CandlestickChan] = []
+    idx: int    # 当前普通K线 idx。
+
+    idx_candle_p1_last: int = 0     # 前1缠论K线的末根普通K线 idx。
+    idx_candle_p1_first: int = 0    # 前1缠论K线的首根普通K线 idx。
+    idx_candle_p2_last: int = -1    # 前2缠论K线的末根普通K线 idx。
+    idx_candle_p2_first: int = -1   # 前2缠论K线的首根普通K线 idx。
+    idx_candle_p3_last: int = -1    # 前3缠论K线的末根普通K线 idx。
+    idx_candle_p3_first: int = -1   # 前3缠论K线的首根普通K线 idx。
+
+    chan_candlestick: List[ChanCandlestick] = []
+
+    idx_fractal_p1: int = -1    # 前1缠论分型的缠论K线 idx。
+    idx_fractal_p2: int = -1    # 前2缠论分型的缠论K线 idx。
+    idx_fractal_p3: int = -1    # 前3缠论分型的缠论K线 idx。
 
     # ----------------------------------------
     # 转化化 df_origin。
     # ----------------------------------------
     df_data: pd.DataFrame = df_origin.reset_index()
 
-    # 添加第1根缠论K线。
-    candlestick_chan.append(
-        CandlestickChan(
-            high=df_data.loc[0, 'high'],
-            low=df_data.loc[0, 'low'],
-            period=1,
-            first=0,
-            last=0
-        )
+    # ----------------------------------------
+    # 初始化 df_chan。
+    # ----------------------------------------
+    df_chan: pd.DataFrame = pd.DataFrame(
+        {
+            '包含？': False,
+            'K线数量': 1,
+            '周期': 1,
+            '高点': 0.0,
+            '低点': 0.0,
+            '分型数量': 0,
+            '分型': '-',
+            '暂定时间': -1,
+            '确认时间': -1,
+            '修正时间': -1,
+        },
+        index=df_data.index
     )
 
+    df_chan.loc[0, '高点'] = df_data.loc[0, 'high']
+    df_chan.loc[0, '低点'] = df_data.loc[0, 'low']
+
+    if debug:
+        print(
+            f"第 {0:>4} / {count:>4} （普通K线）轮：\n"
+            f"    前K线（缠论K线）：idx = {0}, "
+            f"高点 = {df_chan.loc[0, '高点']}, "
+            f"低点 = {df_chan.loc[0, '低点']}\n"
+            f"    本K线（普通K线）：idx = {0}, "
+            f"高点 = {df_data.loc[0, 'high']}, "
+            f"低点 = {df_data.loc[0, 'low']}\n"
+        )
+
+    # ----------------------------------------
+    # 常规处理。
+    # ----------------------------------------
     for idx in range(1, count):
-        candlestick_ordinary = CandlestickOrdinary(
-            high=df_origin.loc[idx, 'high'].copy(),
-            low=df_origin.loc[idx, 'low'].copy()
+        # ----------------------------------------
+        # 转写变量。
+        # ----------------------------------------
+
+        # 本普通K线的高点
+        current_h: float = df_data.loc[idx, 'high']
+
+        # 本普通K线的低点
+        current_l: float = df_data.loc[idx, 'low']
+
+        # 前1缠论K线的高点
+        chan_p1_h: float = df_chan.loc[idx_candle_p1_last, '高点']
+
+        # 前1缠论K线的低点
+        chan_p1_l: float = df_chan.loc[idx_candle_p1_last, '低点']
+
+        if debug:
+            print_debug_before()
+
+        # ----------------------------------------
+        # 如果没有成交/只有一个价位，忽略。
+        # ----------------------------------------
+        if df_data.loc[idx, 'high'] == df_data.loc[idx, 'low']:
+            df_chan.loc[idx, '包含？'] = False
+
+        # ----------------------------------------
+        # 处理：普通K线合并为缠论K线。
+        # ----------------------------------------
+
+        # 本普通K线与前缠论K线是否存在包含关系？
+        df_chan.loc[idx, '包含？'] = is_inclusive(
+            current_h,
+            current_l,
+            chan_p1_h,
+            chan_p1_l
         )
-        merge_candlestick(
-            candlestick_chan=candlestick_chan,
-            candlestick_ordinary=candlestick_ordinary
-        )
+
+        # 如果没有包含：
+        if not df_chan.loc[idx, '包含？']:
+
+            # 新的缠论K线，周期 = 1，高点 = 普通K线高点，低点 = 普通K线低点。
+            df_chan.loc[idx, '周期'] = 1
+            df_chan.loc[idx, '高点'] = df_data.loc[idx, 'high']
+            df_chan.loc[idx, '低点'] = df_data.loc[idx, 'low']
+
+            # K线数量 + 1。
+            df_chan.loc[idx, 'K线数量'] = df_chan.loc[idx_candle_p1_last, 'K线数量'] + 1
+
+            # 前1缠论K线所合并的普通K线，其末根的 idx。
+            idx_candle_p1_last = idx
+            # 其它缠论K线的特征 idx。
+            idx_candle_p1_first, idx_candle_p2_last, idx_candle_p2_first, idx_candle_p3_last, idx_candle_p3_first = \
+                calculate_chan_candlestick_idx(idx_candle_p1_last)
+
+        # 如果存在包含：
+        else:
+            # K线数量不变。
+            df_chan.loc[idx, 'K线数量'] = df_chan.loc[idx_candle_p1_last, 'K线数量']
+
+            # 前1缠论K线所合并的普通K线，其末根的 idx。
+            idx_candle_p1_last += 1
+
+            # 前1缠论K线的周期 + 1。
+            df_chan.loc[idx, '周期'] = df_chan.loc[idx - 1, '周期'] + 1
+
+            # 前1缠论K线所合并的普通K线，其第一根的序号为0（从序号 0 开始的普通K线都被合并了），取前1缠论K线和本普通K线的最大范围。
+            if idx_candle_p1_first == 0:
+                df_chan.loc[idx, '高点'] = max(
+                    df_chan.loc[idx - 1, '高点'],
+                    df_data.loc[idx, 'high']
+                )
+                df_chan.loc[idx, '低点'] = min(
+                    df_chan.loc[idx - 1, '低点'],
+                    df_data.loc[idx, 'low']
+                )
+            # 前1缠论K线不是第一根缠论K线，判断前1缠论K线和前2缠论K线的方向。
+            else:
+                # 前2缠论K线的高低点
+                chan_p2_h = df_chan.loc[idx_candle_p2_last, '高点']
+                chan_p2_l = df_chan.loc[idx_candle_p2_last, '低点']
+
+                if (
+                    (chan_p1_h > chan_p2_h and chan_p1_l <= chan_p2_l) or
+                    (chan_p1_h < chan_p2_h and chan_p1_l >= chan_p2_l)
+                ):
+                    r_h = '>' if chan_p1_h > chan_p2_h else '<'
+                    r_l = '>' if chan_p1_l > chan_p2_l else '<'
+
+                    print(
+                        f'【ERROR】在合并K线时发生错误——未知的前K与前前K高低关系。\n'
+                        f'前1高：{chan_p1_h}，前2高：{chan_p2_h}，{r_h}；\n'
+                        f'前1低：{chan_p1_l}，前2低：{chan_p2_l}，{r_l}。'
+                    )
+                # 前1缠论K线的高点 > 前2缠论K线的高点，合并取 高-高。
+                elif chan_p1_h > chan_p2_h and chan_p1_l > chan_p2_l:
+                    df_chan.loc[idx, '高点'] = max(
+                        df_chan.loc[idx - 1, '高点'],
+                        df_data.loc[idx, 'high']
+                    )
+                    df_chan.loc[idx, '低点'] = max(
+                        df_chan.loc[idx - 1, '低点'],
+                        df_data.loc[idx, 'low']
+                    )
+                # 前1缠论K线的低点 < 前2缠论K线的低点，合并取 低-低。
+                # elif chan_p1_h < chan_p2_h and chan_p1_l < chan_p2_l:
+                else:
+                    df_chan.loc[idx, '高点'] = min(
+                        df_chan.loc[idx - 1, '高点'],
+                        df_data.loc[idx, 'high']
+                    )
+                    df_chan.loc[idx, '低点'] = min(
+                        df_chan.loc[idx - 1, '低点'],
+                        df_data.loc[idx, 'low']
+                    )
+
+        # ----------------------------------------
+        # 处理：分型。
+        # ----------------------------------------
+
+        # 如果K线数量 == 2，作为跳开处理。
+        if df_chan.loc[idx, 'K线数量'] == 2:
+            if debug:
+                print(
+                    f"    处理分型（K线数量 = {df_chan.loc[idx, 'K线数量']}）："
+                )
+            if df_chan.loc[idx_candle_p2_last, '高点'] > df_chan.loc[idx_candle_p1_last, '高点']:
+                # K线数量 + 1。
+                df_chan.loc[idx_candle_p2_last, '分型数量'] = df_chan.loc[idx_candle_p2_last, '分型数量'] + 1
+                df_chan.loc[idx_candle_p2_last, '分型'] = '顶'
+                df_chan.loc[idx_candle_p2_last, '暂定时间'] = idx
+                idx_fractal_p1 = idx_candle_p2_last
+                if debug:
+                    print(f"        前2缠论K线视作【顶分型】。\n")
+            elif df_chan.loc[idx_candle_p2_last, '低点'] < df_chan.loc[idx_candle_p1_last, '低点']:
+                # K线数量 + 1。
+                df_chan.loc[idx_candle_p2_last, '分型数量'] = df_chan.loc[idx_candle_p2_last, '分型数量'] + 1
+                df_chan.loc[idx_candle_p2_last, '分型'] = '底'
+                df_chan.loc[idx_candle_p2_last, '暂定时间'] = idx
+                idx_fractal_p1 = idx_candle_p2_last
+                if debug:
+                    print(f"        前2缠论K线视作【底分型】。\n")
+            else:
+                pass
+
+        # 如果K线数量 > 2，正常处理。
+        elif df_chan.loc[idx, 'K线数量'] > 2:
+            if debug:
+                print(f"    处理分型（K线数量 = {df_chan.loc[idx, 'K线数量']}）：")
+            if df_chan.loc[idx_candle_p2_last, '高点'] == max(
+                    df_chan.loc[idx_candle_p1_last, '高点'],
+                    df_chan.loc[idx_candle_p2_last, '高点'],
+                    df_chan.loc[idx_candle_p3_last, '高点']
+            ):
+                df_chan.loc[idx_candle_p2_last, '分型'] = '顶'
+                df_chan.loc[idx_candle_p2_last, '暂定时间'] = idx
+                if debug:
+                    print(f"        前2缠论K线视作【顶分型】。\n")
+            elif df_chan.loc[idx_candle_p2_last, '低点'] == min(
+                    df_chan.loc[idx_candle_p1_last, '低点'],
+                    df_chan.loc[idx_candle_p2_last, '低点'],
+                    df_chan.loc[idx_candle_p3_last, '低点']
+            ):
+                df_chan.loc[idx_candle_p2_last, '分型'] = '底'
+                df_chan.loc[idx_candle_p2_last, '暂定时间'] = idx
+                if debug:
+                    print(f"        前2缠论K线视作【底分型】。\n")
+            else:
+                pass
+
+        # 如果K线数量 == 1，不做处理。
+        else:
+            if debug:
+                print(
+                    f"    处理分型（K线数量 = {df_chan.loc[idx, 'K线数量']}）：\n"
+                    f"        略过。\n"
+                )
 
         # ----------------------------------------
         # 打印 debug 信息。
         # ----------------------------------------
         if debug:
-            print_debug_after(candlestick_chan, time_start)
+            print_debug_after()
 
     time_end: dt.datetime = dt.datetime.now()
 
     if debug:
         print(f'\n计算完成！\n总计花费： {time_end - time_start}')
 
-    return candlestick_chan
+    return df_chan
+
+
+def plot_theory_of_chan(df_origin: pd.DataFrame,
+                        df_chan: pd.DataFrame,
+                        count: int,
+                        merged_line_width: int = 3,
+                        debug: bool = False):
+    """
+    绘制合并后的K线。
+
+    :param df_origin:
+    :param df_chan:
+    :param count:
+    :param merged_line_width:
+    :param debug:
+
+    ----
+    :return:
+    """
+    mpf_color = mpf.make_marketcolors(
+        up='red',       # 上涨K线的颜色
+        down='green',   # 下跌K线的颜色
+        inherit=True
+    )
+
+    mpf_style = mpf.make_mpf_style(
+        marketcolors=mpf_color,
+        rc={
+            'font.family': 'SimHei',        # 指定默认字体：解决plot不能显示中文问题
+            'axes.unicode_minus': False,    # 解决保存图像是负号'-'显示为方块的问题
+        }
+    )
+
+    mpf_config = {}
+
+    fig, ax_list = mpf.plot(
+        df_origin.iloc[:count],
+        title='AL2111',
+        type='candle',
+        volume=False,
+        show_nontrading=False,
+        figratio=(40, 20),
+        figscale=2,
+        style=mpf_style,
+        tight_layout=True,
+        returnfig=True,
+        return_width_config=mpf_config,
+        warn_too_much_data=1000
+    )
+
+    candle_width = mpf_config['candle_width']
+    line_width = mpf_config['line_width']
+
+    if debug:
+        for k, v in mpf_config.items():
+            print(k, v)
+
+    # 整理合并元素。
+    merged_rectangle = []
+
+    for idx in range(1, count):
+        if pd.isna(df_chan.iloc[idx].at['周期']):
+            break
+        if df_chan.iloc[idx].at['周期'] == 1 and df_chan.iloc[idx - 1].at['周期'] > 1:
+            x0 = idx - df_chan.iloc[idx - 1].at['周期'] - candle_width / 2
+            y0 = df_chan.iloc[idx - 1].at['低点']
+            w = df_chan.iloc[idx - 1].at['周期'] - 1 + candle_width
+            h = df_chan.iloc[idx - 1].at['高点'] - df_chan.iloc[idx - 1].at['低点']
+            merged_rectangle.append(
+                Rectangle(xy=(x0, y0), width=w, height=h, angle=0)
+            )
+
+    # 生成矩形。
+    patch_collection = PatchCollection(
+        merged_rectangle,
+        linewidth=line_width * merged_line_width,
+        edgecolor='black',
+        facecolor='none'
+    )
+
+    ax1 = ax_list[0]
+    ax1.add_collection(patch_collection)
+    ax1.autoscale_view()
+
+    print('Plot done.')
