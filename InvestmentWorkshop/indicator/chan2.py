@@ -11,7 +11,7 @@ __author__ = 'Bruce Frank Wong'
 """
 
 
-from typing import Dict, List, Tuple, Any, Sequence, Optional
+from typing import Dict, List, Tuple, Any, Sequence, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
 import datetime as dt
@@ -52,6 +52,7 @@ class CandlestickChan(CandlestickOrdinary):
 @dataclass
 class Fractal:
     type_: FractalType
+    idx: int
     left: Optional[CandlestickChan]
     middle: CandlestickChan
     right: CandlestickChan
@@ -135,11 +136,13 @@ def is_fractal_bottom(candle_l: CandlestickChan,
 def is_fractal(candle_l: CandlestickChan,
                candle_m: CandlestickChan,
                candle_r: CandlestickChan
-               ) -> bool:
-    if is_fractal_top(candle_l, candle_m, candle_r) or is_fractal_bottom(candle_l, candle_m, candle_r):
-        return True
+               ) -> Tuple[bool, Optional[FractalType]]:
+    if is_fractal_top(candle_l, candle_m, candle_r):
+        return True, FractalType.Top
+    elif is_fractal_bottom(candle_l, candle_m, candle_r):
+        return True, FractalType.Bottom
     else:
-        return False
+        return False, None
 
 
 def get_trend(candle_l: CandlestickChan,
@@ -281,6 +284,7 @@ def update_fractal(candlestick_chan_list: List[CandlestickChan],
         result.append(
             Fractal(
                 type_=fractal,
+                idx=0,
                 left=None,
                 middle=candle_l,
                 right=candle_r
@@ -299,8 +303,25 @@ def update_fractal(candlestick_chan_list: List[CandlestickChan],
     candle_l = candlestick_chan_list[-3]
     candle_m = candlestick_chan_list[-2]
     candle_r = candlestick_chan_list[-1]
-    if is_fractal(candle_l, candle_m, candle_r):
-        pass
+
+    new_fractal: Fractal
+    is_new_fractal, new_fractal_type = is_fractal(candle_l, candle_m, candle_r)
+    if is_new_fractal:
+        # 新分型
+        idx_new_fractal = len(candlestick_chan_list) - 2
+        new_fractal = Fractal(
+            type_=new_fractal_type,
+            idx=idx_new_fractal,
+            left=candle_l,
+            middle=candle_m,
+            right=candle_r
+        )
+
+        # 如果前分型的特征idx==0，前分型特征idx==1，覆盖。
+        idx_previous_fractal = result[-1].idx
+        if idx_previous_fractal == 0 and idx_new_fractal == 1:
+            result[-1].idx = new_fractal
+
     if debug:
         print(
             f'\n    更新分型：\n'
