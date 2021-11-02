@@ -11,7 +11,7 @@ __author__ = 'Bruce Frank Wong'
 """
 
 
-from typing import Dict, List, Tuple, Any, Sequence, Optional, Union
+from typing import Dict, List, Tuple, Any, Sequence, Optional
 from dataclasses import dataclass
 from enum import Enum
 import datetime as dt
@@ -296,18 +296,87 @@ def update_fractal(candlestick_chan_list: List[CandlestickChan],
                    debug: bool = False
                    ) -> Optional[FractalList]:
 
+    # --------------------
+    # 声明变量
+    # --------------------
+
+    # 结果
     result: FractalList = deepcopy(fractal_list)
 
-    # 缠论K线不足 3 根。
-    if len(candlestick_chan_list) < 3:
-        if debug:
-            print(
-                f'\n    更新分型：\n'
-                f'        当前不足3根缠论K线，忽略。'
-            )
-        return None
+    # 最新的缠论K线
+    candle: CandlestickChan = candlestick_chan_list[-1]
+    # 最新的缠论K线的 idx
+    idx_candle: int = len(candlestick_chan_list) - 1
 
-    # 其他情况
+    # 已存在的分型的数量。
+    fractal_count: int = 0 if result is None else len(result)
+
+    # 前分型。
+    fractal: FractalStandard = result[-1] if fractal_count >= 1 else None
+    # 前分型的中间缠论K线 idx
+    idx_fractal: int = candlestick_chan_list.index(fractal.middle) if fractal_count >= 1 else 0
+
+    # ----------------------------------------
+    # 如果分型数量 > 0，且 前分型未被确认：
+    # ----------------------------------------
+    if fractal_count > 0:  # and not fractal.is_confirmed:
+        # --------------------
+        # 确认 前分型。
+        # --------------------
+
+        # 如果当前缠论K线与前分型中间K线的距离 >= 4 （即中间有3根缠论K线）。
+        distance: int = idx_candle - idx_fractal
+        if distance >= 4:
+            fractal.is_confirmed = True
+            if debug:
+                print(
+                    f'\n'
+                    f'    确认分型：\n'
+                    f'        当前K线（缠论idx = {idx_candle}，普通idx = {candle.last}）与'
+                    f'前分型（分型idx = {fractal_count - 1}，缠论idx = {idx_fractal}，普通idx = {fractal.middle.last}）'
+                    f'之间有 {distance - 1} 根缠论K线，无论行情如何变化，该分型可以被确认。\n'
+                )
+
+        # --------------------
+        # 丢弃 前分型。
+        # --------------------
+
+        # 如果当前缠论K线的极值顺着前分型的方向突破（即最高价大于顶分型中间K线的最高价，对底分型反之）。
+        if fractal.type_ == FractalType.Top:
+            extreme_type = '最高价'
+            value_candle = candle.high
+            value_fractal = fractal.middle.high
+        else:
+            extreme_type = '最低价'
+            value_candle = candle.low
+            value_fractal = fractal.middle.low
+        if (
+                (
+                        fractal.type_ == FractalType.Top and value_candle > value_fractal
+                ) or
+                (
+                        fractal.type_ == FractalType.Bottom and value_candle < value_fractal
+                )
+        ):
+            if debug:
+                print(
+                    f'\n'
+                    f'    丢弃分型：\n'
+                    f'        当前缠论K线的{extreme_type}({value_candle})超越了与前分型的极值（{value_fractal}），丢弃前分型。\n'
+                )
+
+            # 丢弃前分型。
+            result.remove(fractal)
+            # 重新统计分型数量。
+            fractal_count = 0 if result is None else len(result)
+            # 重新索引前分型。
+            fractal: FractalStandard = result[-1] if fractal_count >= 1 else None
+            # 重新索引前分型的中间缠论K线 idx
+            idx_fractal = candlestick_chan_list.index(fractal.middle) if fractal_count >= 1 else 0
+
+    # --------------------
+    # 生成 分型。
+    # --------------------
     candle_l = candlestick_chan_list[-3]
     candle_m = candlestick_chan_list[-2]
     candle_r = candlestick_chan_list[-1]
@@ -315,7 +384,7 @@ def update_fractal(candlestick_chan_list: List[CandlestickChan],
     is_new_fractal, new_fractal_type = is_fractal(candle_l, candle_m, candle_r)
     if is_new_fractal:
 
-        # 新分型
+        # 生成新分型。
         new_fractal: FractalStandard = FractalStandard(
             type_=new_fractal_type,
             is_confirmed=False,
@@ -324,101 +393,167 @@ def update_fractal(candlestick_chan_list: List[CandlestickChan],
             right=candle_r
         )
 
-        # 已存在的分型的数量。
-        count: int = 0 if result is None else len(result)
-
-        if debug:
-            print(
-                f'\n    更新分型：\n'
-                f'        生成第 {count + 1} 个分型：{new_fractal_type}。\n'
-                f'        缠论K线 idx = {candlestick_chan_list.index(candle_m)}， 普通K线 idx = {candle_m.last}。'
-            )
-
-        # 第1个分型：
-        if count == 0:
+        # 如果这是第1个分型，加入列表。
+        if fractal_count == 0:
             result = [new_fractal]
             if debug:
-                print(f'        缓存新分型。')
-
-        # 是第2个分型：
-        elif count == 1:
-            # 前分型。
-            old_fractal: FractalStandard = result[-1]
-
-            # 分型间距离。
-            distance: int = get_fractal_distance(old_fractal, new_fractal, candlestick_chan_list)
-
-            # 共用K线:
-            if distance <= 2:
-                # 类型不同
-                if new_fractal.type_ != old_fractal.type_:
-                    if debug:
-                        print(
-                            f'        新分型与前分型共用K线（距离 = {distance}），与前分型类型不同，放弃新分型。'
-                        )
-                else:
-                    if (
-                            (
-                                    new_fractal.type_ == FractalType.Top and
-                                    new_fractal.middle.low < old_fractal.middle.low
-                            ) or
-                            (
-                                    new_fractal.type_ == FractalType.Bottom and
-                                    new_fractal.middle.high > old_fractal.middle.high
-                            )
-                    ):
-                        result[-1] = new_fractal
-                        if debug:
-                            print(
-                                f'        新分型与前分型共用K线（距离 = {distance}），与前分型类型相同，极值更大，替换前分型。'
-                            )
-                    else:
-                        if debug:
-                            print(
-                                f'        新分型与前分型共用K线（距离 = {distance}），与前分型类型相同，极值不如，放弃新分型。'
-                            )
-
-            # 不共用K线：
-            else:
-                # 类型不同
-                if new_fractal.type_ != old_fractal.type_:
-                    if (
-                            (
-                                    old_fractal.type_ == FractalType.Top and
-                                    new_fractal.middle.low > old_fractal.middle.low
-                            ) or
-                            (
-                                    new_fractal.type_ == FractalType.Bottom and
-                                    new_fractal.middle.high < old_fractal.middle.high
-                            )
-                    ):
-                        if debug:
-                            print(
-                                f'        新分型与前分型不共用K线（距离 = {distance}），与前分型类型不同，未突破，放弃新分型。'
-                            )
-                    else:
-                        result.append(new_fractal)
-                        if debug:
-                            print(
-                                f'        新分型与前分型不共用K线（距离 = {distance}），与前分型类型不同，突破前分型极值，确认新分型。'
-                            )
-                else:
-                    result.append(new_fractal)
-                    if debug:
-                        print(
-                            f'        新分型与前分型不共用K线（距离 = {distance}），与前分型类型相同，确认新分型。'
-                        )
-
-        # 是更后面的分型：
-        else:
-
-            if debug:
                 print(
-                    f'\n    更新分型：\n'
-                    f'        尚未完成。'
+                    f'\n'
+                    f'    生成分型：\n'
+                    f'        第 {fractal_count + 1} 个分型，类型为 {new_fractal_type}。\n'
+                    f'        缠论K线 idx = {candlestick_chan_list.index(candle_m)}， 普通K线 idx = {candle_m.last}。'
                 )
 
+        # 这不是第1个分型：
+        else:
+            # 新生成的分型：
+            #     1. 不能和前分型重复（中间K线一样） -> 和前分型有足够距离
+            #     2. 不接受同向分型（除非极值跟大，但这样在前面就被丢弃了）
+            #     3. 前分型未被确认的时候不接受反向分型 -> 取消确认一说。
+            # if candle_m != fractal.middle and new_fractal_type != fractal.type_ and fractal.is_confirmed:
+            if candlestick_chan_list.index(candle_m) - candlestick_chan_list.index(fractal.middle) >= 4 and \
+                    new_fractal_type != fractal.type_:
+                result.append(new_fractal)
+
+                if debug:
+                    print(
+                        f'\n'
+                        f'    生成分型：\n'
+                        f'        第 {fractal_count + 1} 个分型，类型为 {new_fractal_type}。\n'
+                        f'        缠论K线 idx = {candlestick_chan_list.index(candle_m)}， 普通K线 idx = {candle_m.last}。'
+                    )
+
     return result
+
+
+# def update_fractal(candlestick_chan_list: List[CandlestickChan],
+#                    fractal_list: FractalList,
+#                    debug: bool = False
+#                    ) -> Optional[FractalList]:
+#
+#     result: FractalList = deepcopy(fractal_list)
+#
+#     # 缠论K线不足 3 根。
+#     if len(candlestick_chan_list) < 3:
+#         if debug:
+#             print(
+#                 f'\n    更新分型：\n'
+#                 f'        当前不足3根缠论K线，忽略。'
+#             )
+#         return None
+#
+#     # 其他情况
+#     candle_l = candlestick_chan_list[-3]
+#     candle_m = candlestick_chan_list[-2]
+#     candle_r = candlestick_chan_list[-1]
+#
+#     is_new_fractal, new_fractal_type = is_fractal(candle_l, candle_m, candle_r)
+#     if is_new_fractal:
+#
+#         # 新分型
+#         new_fractal: FractalStandard = FractalStandard(
+#             type_=new_fractal_type,
+#             is_confirmed=False,
+#             left=candle_l,
+#             middle=candle_m,
+#             right=candle_r
+#         )
+#
+#         # 已存在的分型的数量。
+#         count: int = 0 if result is None else len(result)
+#
+#         if debug:
+#             print(
+#                 f'\n    更新分型：\n'
+#                 f'        生成第 {count + 1} 个分型：{new_fractal_type}。\n'
+#                 f'        缠论K线 idx = {candlestick_chan_list.index(candle_m)}， 普通K线 idx = {candle_m.last}。'
+#             )
+#
+#         # 第1个分型：
+#         if count == 0:
+#             result = [new_fractal]
+#             if debug:
+#                 print(f'        缓存新分型。')
+#
+#         # 是第2个分型：
+#         elif count == 1:
+#             # 前分型。
+#             old_fractal: FractalStandard = result[-1]
+#
+#             # 分型间距离。
+#             distance: int = get_fractal_distance(old_fractal, new_fractal, candlestick_chan_list)
+#
+#             # 共用K线:
+#             if distance <= 2:
+#                 # 类型不同
+#                 if new_fractal.type_ != old_fractal.type_:
+#                     if debug:
+#                         print(
+#                             f'        新分型与前分型共用K线（距离 = {distance}），与前分型类型不同，放弃新分型。'
+#                         )
+#                 else:
+#                     if (
+#                             (
+#                                     new_fractal.type_ == FractalType.Top and
+#                                     new_fractal.middle.low < old_fractal.middle.low
+#                             ) or
+#                             (
+#                                     new_fractal.type_ == FractalType.Bottom and
+#                                     new_fractal.middle.high > old_fractal.middle.high
+#                             )
+#                     ):
+#                         result[-1] = new_fractal
+#                         if debug:
+#                             print(
+#                                 f'        新分型与前分型共用K线（距离 = {distance}），与前分型类型相同，极值更大，替换前分型。'
+#                             )
+#                     else:
+#                         if debug:
+#                             print(
+#                                 f'        新分型与前分型共用K线（距离 = {distance}），与前分型类型相同，极值不如，放弃新分型。'
+#                             )
+#
+#             # 不共用K线：
+#             else:
+#                 # 类型不同
+#                 if new_fractal.type_ != old_fractal.type_:
+#                     if (
+#                             (
+#                                     old_fractal.type_ == FractalType.Top and
+#                                     new_fractal.middle.low > old_fractal.middle.low
+#                             ) or
+#                             (
+#                                     new_fractal.type_ == FractalType.Bottom and
+#                                     new_fractal.middle.high < old_fractal.middle.high
+#                             )
+#                     ):
+#                         if debug:
+#                             print(
+#                                 f'        新分型与前分型不共用K线（距离 = {distance}），与前分型类型不同，未突破，放弃新分型。'
+#                             )
+#                     else:
+#                         result.append(new_fractal)
+#                         if debug:
+#                             print(
+#                                 f'        新分型与前分型不共用K线（距离 = {distance}），与前分型类型不同，突破前分型极值，确认新分型。'
+#                             )
+#                 else:
+#                     result.append(new_fractal)
+#                     if debug:
+#                         print(
+#                             f'        新分型与前分型不共用K线（距离 = {distance}），与前分型类型相同，确认新分型。'
+#                         )
+#
+#         # 是更后面的分型：
+#         else:
+#
+#             if debug:
+#                 print(
+#                     f'\n    更新分型：\n'
+#                     f'        尚未完成。'
+#                 )
+#
+#     return result
 
 
 # def update_fractal(candlestick_chan_list: List[CandlestickChan],
@@ -534,40 +669,63 @@ def print_debug_before(idx: int,
 
 
 def print_debug_after(candlestick_list: CandlestickChanList,
+                      fractal_list: FractalList,
                       base_time: dt.datetime) -> None:
     """
     Print information after processing each turn.
 
     :param candlestick_list:
+    :param fractal_list:
     :param base_time:
     :return:
     """
     time_current: dt.datetime = dt.datetime.now()
 
-    count: int = len(candlestick_list)
+    count_candle: int = len(candlestick_list)
 
     print(
-        f'\n    【处理完毕】，用时 {time_current - base_time}，结果如下：\n'
-        f'        缠论K线数量： {count}。'
+        f'\n    【处理完毕】，用时 {time_current - base_time}。\n'
+        f'\n        缠论K线数量： {count_candle}。'
     )
     print(
         f'        前1缠论K线：自 {candlestick_list[-1].first} 至 {candlestick_list[-1].last}，'
         f'周期 = {candlestick_list[-1].period}；'
     )
-    if count >= 2:
+    if count_candle >= 2:
         print(
             f'        前2缠论K线：自 {candlestick_list[-2].first} 至 {candlestick_list[-2].last}，'
             f'周期 = {candlestick_list[-2].period}；'
         )
     else:
         print('        前2缠论K线：  不存在；')
-    if count >= 3:
+    if count_candle >= 3:
         print(
             f'        前3缠论K线：自 {candlestick_list[-3].first} 至 {candlestick_list[-3].last}，'
             f'周期 = {candlestick_list[-3].period}。'
         )
     else:
         print('        前3缠论K线：  不存在。')
+
+    count_fractal: int = 0 if fractal_list is None else len(fractal_list)
+    print(
+        f'\n        分型数量： {count_fractal}。'
+    )
+    if count_fractal >= 1:
+        fractal = fractal_list[-1]
+        confirmed = '已确认' if fractal.is_confirmed else '未确认'
+        print(
+            f'        分型(f-1)： {confirmed}，type = {fractal.type_.value}，idx = {fractal.middle.last}。'
+        )
+    else:
+        print('        分型(f-1)：   不存在。')
+    if count_fractal >= 2:
+        fractal = fractal_list[-2]
+        confirmed = '已确认' if fractal.is_confirmed else '未确认'
+        print(
+            f'        分型(f-2)： {confirmed}，type = {fractal.type_.value}，idx = {fractal.middle.last}。'
+        )
+    else:
+        print('        分型(f-2)：   不存在。')
 
 
 def theory_of_chan_2(df_origin: pd.DataFrame,
@@ -657,18 +815,26 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
             debug=debug
         )
 
-        # 如果缠论K线有变化（新增或修正），更新分型。
-        # if len(candlestick_chan_list) != chan_candle_count or candlestick_chan_list[-1] != chan_candle_last:
-        fractal_list = update_fractal(
-            candlestick_chan_list=candlestick_chan_list,
-            fractal_list=fractal_list,
-            debug=debug
-        )
-        # else:
-        #     if debug:
-        #         print(
-        #             f'\n    缠论K线无变化，无需更新分型。\n'
-        #         )
+        # 如果缠论K线数量 >= 3，且有变化（新增或修正），更新分型。
+        if len(candlestick_chan_list) >= 3:
+            if len(candlestick_chan_list) > chan_candle_count or candlestick_chan_list[-1] != chan_candle_last:
+                fractal_list = update_fractal(
+                    candlestick_chan_list=candlestick_chan_list,
+                    fractal_list=fractal_list,
+                    debug=debug
+                )
+            else:
+                if debug:
+                    print(
+                        f'\n    更新分型：\n'
+                        f'        缠论K线无更新，略过。'
+                    )
+        else:
+            if debug:
+                print(
+                    f'\n    更新分型：\n'
+                    f'        缠论K线少于3根，略过。'
+                )
 
         # ----------------------------------------
         # 打印 debug 信息。
@@ -676,6 +842,7 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
         if debug:
             print_debug_after(
                 candlestick_list=candlestick_chan_list,
+                fractal_list=fractal_list,
                 base_time=time_start
             )
 
@@ -691,9 +858,15 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
                           candlestick_chan_list: CandlestickChanList,
                           fractal_list: FractalList,
                           count: int,
+                          title: str = '',
+                          tight_layout: bool = True,
+                          show_ordinary_idx: bool = False,
+                          show_chan_idx: bool = False,
                           merged_line_width: int = 3,
                           show_all_merged: bool = False,
                           hatch_merged: bool = False,
+                          fractal_marker_size: int = 100,
+                          fractal_marker_offset: int = 50,
                           debug: bool = False):
     """
     绘制合并后的K线。
@@ -702,9 +875,15 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
     :param candlestick_chan_list:
     :param fractal_list:
     :param count:
+    :param title:
+    :param tight_layout:
+    :param show_ordinary_idx:
+    :param show_chan_idx:
     :param merged_line_width:
     :param show_all_merged:
     :param hatch_merged:
+    :param fractal_marker_size:
+    :param fractal_marker_offset:
     :param debug:
 
     ----
@@ -724,18 +903,51 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
         }
     )
 
+    # 附加元素
+    additional_plot: list = []
+
+    # 分型
+    fractal_t: list = []
+    fractal_b: list = []
+    idx_fractal_to_ordinary: int
+    idx_ordinary_candle: int = 0
+    for fractal in fractal_list:
+        idx_fractal_to_ordinary = fractal.middle.last
+        for idx in range(idx_ordinary_candle, idx_fractal_to_ordinary):
+            fractal_t.append(np.nan)
+            fractal_b.append(np.nan)
+        if fractal.type_ == FractalType.Top:
+            fractal_t.append(fractal.middle.high + fractal_marker_offset)
+            fractal_b.append(np.nan)
+        if fractal.type_ == FractalType.Bottom:
+            fractal_t.append(np.nan)
+            fractal_b.append(fractal.middle.low - fractal_marker_offset)
+        idx_ordinary_candle = idx_fractal_to_ordinary + 1
+    for idx in range(idx_ordinary_candle, count):
+        fractal_t.append(np.nan)
+        fractal_b.append(np.nan)
+
+    additional_plot.append(
+        mpf.make_addplot(fractal_t, type='scatter', markersize=fractal_marker_size, marker='v')
+    )
+    additional_plot.append(
+        mpf.make_addplot(fractal_b, type='scatter', markersize=fractal_marker_size, marker='^')
+    )
+
+    # mplfinance 的配置
     mpf_config = {}
 
     fig, ax_list = mpf.plot(
         df_origin.iloc[:count],
-        title='AL2111',
+        title=title,
         type='candle',
         volume=False,
+        addplot=additional_plot,
         show_nontrading=False,
         figratio=(40, 20),
         figscale=2,
         style=mpf_style,
-        tight_layout=True,
+        tight_layout=tight_layout,
         returnfig=True,
         return_width_config=mpf_config,
         warn_too_much_data=1000
@@ -789,6 +1001,52 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
 
     ax1 = ax_list[0]
     ax1.add_collection(patch_collection)
+
+    # 普通K线 idx
+    if show_ordinary_idx:
+        idx_ordinary_x: List[int] = []
+        idx_ordinary_y: List[float] = []
+        idx_ordinary_value: List[str] = []
+        
+        for idx in range(0, count, 5):
+            idx_ordinary_x.append(idx - candle_width / 2)
+            idx_ordinary_y.append(df_origin.iloc[idx].at['low'] - 14)
+            idx_ordinary_value.append(str(idx))
+
+        for idx in range(len(idx_ordinary_x)):
+            ax1.text(
+                x=idx_ordinary_x[idx],
+                y=idx_ordinary_y[idx],
+                s=idx_ordinary_value[idx],
+                color='red',
+                fontsize=7,
+                horizontalalignment='left',
+                verticalalignment='top'
+            )
+
+    # 缠论K线 idx
+    if show_chan_idx:
+        idx_chan_x: List[int] = []
+        idx_chan_y: List[float] = []
+        idx_chan_value: List[str] = []
+
+        for idx in range(len(candlestick_chan_list)):
+            candle = candlestick_chan_list[idx]
+            idx_chan_x.append(candle.last - candle_width / 2)
+            idx_chan_y.append(candle.high + 14)
+            idx_chan_value.append(str(candlestick_chan_list.index(candle)))
+
+        for idx in range(len(idx_chan_x)):
+            ax1.text(
+                x=idx_chan_x[idx],
+                y=idx_chan_y[idx],
+                s=idx_chan_value[idx],
+                color='blue',
+                fontsize=7,
+                horizontalalignment='left',
+                verticalalignment='bottom'
+            )
+
     ax1.autoscale_view()
 
     print('Plot done.')
