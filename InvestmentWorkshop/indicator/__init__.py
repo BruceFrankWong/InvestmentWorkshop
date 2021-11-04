@@ -10,10 +10,6 @@ from .ma import (
 from .pbx import pbx
 from .boll import boll
 from .chan import (
-    theory_of_chan,
-    plot_theory_of_chan,
-)
-from .chan2 import (
     theory_of_chan_2,
     plot_theory_of_chan_2,
 )
