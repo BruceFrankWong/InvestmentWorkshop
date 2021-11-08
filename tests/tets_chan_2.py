@@ -6,7 +6,7 @@ __author__ = 'Bruce Frank Wong'
 import pytest
 
 from InvestmentWorkshop.indicator.chan2 import (
-    CandlestickOrdinary,
+    OrdinaryCandle,
     is_inclusive_number,
     is_inclusive_candle
 )
@@ -16,14 +16,14 @@ from InvestmentWorkshop.indicator.chan2 import (
     'candle_1, candle_2, result',
     [
         (
-            CandlestickOrdinary(high=23900.0, low=23840.0),
-            CandlestickOrdinary(high=23895.0, low=23845.0),
-            True
+                OrdinaryCandle(high=23900.0, low=23840.0),
+                OrdinaryCandle(high=23895.0, low=23845.0),
+                True
         ),
         (
-            CandlestickOrdinary(high=23900.0, low=23840.0),
-            CandlestickOrdinary(high=23895.0, low=23845.0),
-            True
+                OrdinaryCandle(high=23900.0, low=23840.0),
+                OrdinaryCandle(high=23895.0, low=23845.0),
+                True
         ),
         (2019, 8),
         (2008, 12),
