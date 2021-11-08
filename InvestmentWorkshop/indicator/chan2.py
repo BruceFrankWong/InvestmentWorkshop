@@ -71,6 +71,7 @@ class MergedCandle(OrdinaryCandle):
     def __str__(self) -> str:
         return f'MergedCandle (idx={self.idx}, period={self.period}, ' \
                f'first_ordinary_idx={self.first_ordinary_idx}, ' \
+               f'last_ordinary_idx={self.last_ordinary_idx}, ' \
                f'price_high={self.high}, price_low={self.low})'
 
 
@@ -304,8 +305,10 @@ class ChanTheory:
         """
 
         # debug message.
-        msg_generated: str = '\n  ○ 生成K线：\n    当前合并K线 高点 = {high}，低点 = {low}。\n'
-        msg_merged: str = '\n  ○ 合并K线：\n    当前合并K线 高点 = {high}，低点 = {low}。\n'
+        msg_generated: str = '\n  ○ 生成K线：\n    第 {idx} 根合并K线 起始普通K线idx={ordinary_idx}，周期={period}，' \
+                             '高点={high}，低点={low}。\n'
+        msg_merged: str = '\n  ○ 合并K线：\n    第 {idx} 根合并K线 起始普通K线idx={ordinary_idx}，周期={period}，' \
+                          '高点={high}，低点={low}。\n'
 
         # 申明变量类型并赋值。
         is_changed: bool = False
@@ -345,7 +348,7 @@ class ChanTheory:
             # 如果有包含关系：
             else:
                 # 前1合并K线的周期 + 1。
-                merged_candle_p1.period += 1
+                # merged_candle_p1.period += 1
 
                 # 如果前合并K线是第一根合并K线：
                 #     取前合并K线和新普通K线的最大范围。
@@ -361,7 +364,7 @@ class ChanTheory:
                             ordinary_candle.low
                         ),
                         period=merged_candle_p1.period + 1,
-                        first_ordinary_idx=merged_candle_p1.last_ordinary_idx
+                        first_ordinary_idx=merged_candle_p1.first_ordinary_idx
                     )
                     is_merged = True
 
@@ -387,7 +390,7 @@ class ChanTheory:
                                 ordinary_candle.low
                             ),
                             period=merged_candle_p1.period + 1,
-                            first_ordinary_idx=merged_candle_p1.last_ordinary_idx
+                            first_ordinary_idx=merged_candle_p1.first_ordinary_idx
                         )
                         is_merged = True
 
@@ -408,7 +411,7 @@ class ChanTheory:
                                 ordinary_candle.low
                             ),
                             period=merged_candle_p1.period + 1,
-                            first_ordinary_idx=merged_candle_p1.last_ordinary_idx
+                            first_ordinary_idx=merged_candle_p1.first_ordinary_idx
                         )
                         is_merged = True
 
@@ -427,6 +430,9 @@ class ChanTheory:
             if self._debug:
                 print(
                     msg_generated.format(
+                        idx=new_merged_candle.idx,
+                        ordinary_idx=new_merged_candle.last_ordinary_idx,
+                        period=new_merged_candle.period,
                         high=new_merged_candle.high,
                         low=new_merged_candle.low
                     )
@@ -438,6 +444,9 @@ class ChanTheory:
             if self._debug:
                 print(
                     msg_merged.format(
+                        idx=new_merged_candle.idx,
+                        ordinary_idx=new_merged_candle.last_ordinary_idx,
+                        period=new_merged_candle.period,
                         high=new_merged_candle.high,
                         low=new_merged_candle.low
                     )
@@ -532,9 +541,9 @@ class ChanTheory:
             return False
 
         # debug message
-        msg_generate: str = '\n  ○ 生成笔：\n    第 {count} 根笔，趋势 = {trend}，' \
+        msg_generate: str = '\n  ○ 生成笔：\n    第 {idx} 根笔，趋势 = {trend}，' \
                             '起点（普通K线 idx） = {left}，终点（普通K线 idx） = {right}。\n'
-        msg_extend: str = '\n  ○ 延伸笔：\n    第 {count} 根笔，趋势 = {trend}，' \
+        msg_extend: str = '\n  ○ 延伸笔：\n    第 {idx} 根笔，趋势 = {trend}，' \
                           '原终点起点（普通K线 idx） = {old}，现终点（普通K线 idx） = {new}。\n'
 
         # 申明变量类型并赋值。
@@ -559,7 +568,7 @@ class ChanTheory:
             if self._debug:
                 print(
                     msg_generate.format(
-                        count=self.count_strokes,
+                        idx=new_stroke.idx,
                         trend=new_stroke.trend,
                         left=new_stroke.left_fractal.middle_candle.last_ordinary_idx,
                         right=new_stroke.right_fractal.middle_candle.last_ordinary_idx
@@ -605,7 +614,7 @@ class ChanTheory:
                     if self._debug:
                         print(
                             msg_extend.format(
-                                count=self.count_strokes,
+                                idx=last_stroke.idx,
                                 trend=last_stroke.trend,
                                 old=last_stroke.right_fractal.middle_candle.last_ordinary_idx,
                                 new=fractal_p1.middle_candle.last_ordinary_idx
@@ -637,7 +646,7 @@ class ChanTheory:
                     if self._debug:
                         print(
                             msg_generate.format(
-                                count=self.count_strokes,
+                                idx=new_stroke.idx,
                                 trend=new_stroke.trend,
                                 left=new_stroke.left_fractal.middle_candle.last_ordinary_idx,
                                 right=new_stroke.right_fractal.middle_candle.last_ordinary_idx
@@ -805,11 +814,11 @@ class ChanTheory:
             is_changed = self.generate_segment()
 
     def run_with_dataframe(self, df: pd.DataFrame, count: int = 0):
-        count = len(df) if count == 0 else count
-        width: int = len(str(count - 1)) + 1
-        for idx in range(count):
+        working_count: int = len(df) if count == 0 else count
+        width: int = len(str(working_count - 1)) + 1
+        for idx in range(working_count):
             if self._debug:
-                print(f'\n【第 {idx:>{width}} / {count - 1:>{width}} 轮】（按普通K线编号）\n')
+                print(f'\n【第 {idx:>{width}} / {working_count - 1:>{width}} 轮】（按普通K线编号）')
             self.run_step_by_step(
                 high=df.iloc[idx].at['high'].copy(),
                 low=df.iloc[idx].at['low'].copy()
@@ -894,23 +903,16 @@ class ChanTheory:
         # 附加元素
         additional_plot: list = []
 
-        # 分型和笔
+        # 分型
         fractal_t: list = []
         fractal_b: list = []
         idx_fractal_to_ordinary: int
         idx_ordinary_candle: int = 0
-        stroke: List[Tuple[str, float]] = []  # 笔
 
         for i in range(self.count_fractals):
             fractal = self._fractals[i]
             idx_fractal_to_ordinary = fractal.ordinary_idx
             idx_fractal_to_df = df.index[idx_fractal_to_ordinary]
-            stroke.append(
-                (
-                    idx_fractal_to_df,
-                    fractal.extreme_price
-                )
-            )
             for j in range(idx_ordinary_candle, idx_fractal_to_ordinary):
                 fractal_t.append(np.nan)
                 fractal_b.append(np.nan)
@@ -932,6 +934,17 @@ class ChanTheory:
             mpf.make_addplot(fractal_b, type='scatter', markersize=fractal_marker_size, marker='^')
         )
 
+        # 笔
+        plot_stroke: List[Tuple[str, float]] = []
+
+        for stroke in self._strokes:
+            plot_stroke.append(
+                (
+                    df.index[stroke.left_ordinary_idx],
+                    stroke.left_price
+                )
+            )
+
         # mplfinance 的配置
         mpf_config = {}
 
@@ -940,7 +953,7 @@ class ChanTheory:
             type='candle',
             volume=False,
             addplot=additional_plot,
-            alines=dict(alines=stroke, colors='k', linestyle='--', linewidths=0.05),
+            alines=dict(alines=plot_stroke, colors='k', linestyle='--', linewidths=0.05),
             show_nontrading=False,
             figratio=(40, 20),
             figscale=2,
