@@ -16,24 +16,24 @@ from .utility import (
 )
 
 
-def merge_candle(chan_candle_list: MergedCandleList,
+def merge_candle(merged_candle_list: MergedCandleList,
                  ordinary_candle: OrdinaryCandle,
                  debug: bool = False
                  ) -> List[MergedCandle]:
     """
     合并K线。
 
-    :param chan_candle_list:
+    :param merged_candle_list:
     :param ordinary_candle:
     :param debug:
 
     :return:
     """
 
-    result: List[MergedCandle] = deepcopy(chan_candle_list)
+    result: List[MergedCandle] = deepcopy(merged_candle_list)
 
     is_inclusive: bool = is_inclusive_candle(
-        chan_candle_list[-1],
+        merged_candle_list[-1],
         ordinary_candle
     )
 
@@ -43,10 +43,11 @@ def merge_candle(chan_candle_list: MergedCandleList,
         # 新的缠论K线，高点 = 普通K线高点，低点 = 普通K线低点，周期 = 1，。
         result.append(
             MergedCandle(
+                idx=len(merged_candle_list),
                 high=ordinary_candle.high,
                 low=ordinary_candle.low,
                 period=1,
-                idx_first_ordinary_candle=chan_candle_list[-1].idx_last_ordinary_candle + 1,
+                first_ordinary_idx=merged_candle_list[-1].last_ordinary_idx + 1,
             )
         )
 
@@ -56,7 +57,7 @@ def merge_candle(chan_candle_list: MergedCandleList,
         result[-1].period += 1
 
         # 前1缠论K线所合并的普通K线，其第一根的序号为0（从序号 0 开始的普通K线都被合并了），取前1缠论K线和本普通K线的最大范围。
-        if result[-1].idx_first_ordinary_candle == 0:
+        if result[-1].first_ordinary_idx == 0:
             result[-1].high = max(
                 result[-1].high,
                 ordinary_candle.high

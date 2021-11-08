@@ -11,5 +11,6 @@ from .chan_theory import (
     theory_of_chan_2
 )
 from .plot import (
-    plot_theory_of_chan_2
+    plot_chan_theory,
+    plot_pure_merged_candle
 )

@@ -15,29 +15,49 @@ from .definition import (
     MergedCandleList,
     FractalType,
     FractalList,
+    SegmentList,
 )
 
 
-def plot_theory_of_chan_2(df_origin: pd.DataFrame,
-                          merged_candle_list: MergedCandleList,
-                          fractal_list: FractalList,
-                          count: int,
-                          title: str = '',
-                          tight_layout: bool = True,
-                          show_ordinary_idx: bool = False,
-                          show_chan_idx: bool = False,
-                          merged_candle_edge_width: int = 3,
-                          show_all_merged: bool = False,
-                          hatch_merged: bool = False,
-                          fractal_marker_size: int = 100,
-                          fractal_marker_offset: int = 50,
-                          debug: bool = False):
+def get_plot_style():
+    mpf_color = mpf.make_marketcolors(
+        up='red',  # 上涨K线的颜色
+        down='green',  # 下跌K线的颜色
+        inherit=True
+    )
+
+    mpf_style = mpf.make_mpf_style(
+        marketcolors=mpf_color,
+        rc={
+            'font.family': 'SimHei',  # 指定默认字体：解决plot不能显示中文问题
+            'axes.unicode_minus': False,  # 解决保存图像是负号'-'显示为方块的问题
+        }
+    )
+    return mpf_style
+
+
+def plot_chan_theory(df_origin: pd.DataFrame,
+                     merged_candle_list: MergedCandleList,
+                     fractal_list: FractalList,
+                     segment_list: SegmentList,
+                     count: int,
+                     title: str = '',
+                     tight_layout: bool = True,
+                     show_ordinary_idx: bool = False,
+                     show_chan_idx: bool = False,
+                     merged_candle_edge_width: int = 3,
+                     show_all_merged: bool = False,
+                     hatch_merged: bool = False,
+                     fractal_marker_size: int = 100,
+                     fractal_marker_offset: int = 50,
+                     debug: bool = False):
     """
     绘制合并后的K线。
 
     :param df_origin:
     :param merged_candle_list:
     :param fractal_list:
+    :param segment_list:
     :param count:
     :param title:
     :param tight_layout:
@@ -57,24 +77,12 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
     print(f'merged_candle_list: {len(merged_candle_list)}')
     print(f'fractal_list: {len(fractal_list)}')
 
-    mpf_color = mpf.make_marketcolors(
-        up='red',  # 上涨K线的颜色
-        down='green',  # 下跌K线的颜色
-        inherit=True
-    )
-
-    mpf_style = mpf.make_mpf_style(
-        marketcolors=mpf_color,
-        rc={
-            'font.family': 'SimHei',  # 指定默认字体：解决plot不能显示中文问题
-            'axes.unicode_minus': False,  # 解决保存图像是负号'-'显示为方块的问题
-        }
-    )
+    style = get_plot_style()
 
     # 附加元素
     additional_plot: list = []
 
-    # 分型和笔
+    # 分型 和 笔
     fractal_t: list = []
     fractal_b: list = []
     idx_fractal_to_ordinary: int
@@ -83,15 +91,14 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
 
     for i in range(len(fractal_list)):
         fractal = fractal_list[i]
-        idx_fractal_to_ordinary = fractal.middle_candle.idx_last_ordinary_candle
-        idx_fractal_to_df = df_origin.index[idx_fractal_to_ordinary]
+
         stroke.append(
             (
-                idx_fractal_to_df,
-                fractal.middle_candle.high if fractal.type_ == FractalType.Top else fractal.middle_candle.low
+                df_origin.index[fractal.middle_candle.last_ordinary_idx],
+                fractal.extreme_price
             )
         )
-        for j in range(idx_ordinary_candle, idx_fractal_to_ordinary):
+        for j in range(idx_ordinary_candle, fractal.middle_candle.last_ordinary_idx):
             fractal_t.append(np.nan)
             fractal_b.append(np.nan)
         if fractal.type_ == FractalType.Top:
@@ -100,7 +107,7 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
         if fractal.type_ == FractalType.Bottom:
             fractal_t.append(np.nan)
             fractal_b.append(fractal.middle_candle.low - fractal_marker_offset)
-        idx_ordinary_candle = idx_fractal_to_ordinary + 1
+        idx_ordinary_candle = fractal.middle_candle.last_ordinary_idx + 1
     for i in range(idx_ordinary_candle, count):
         fractal_t.append(np.nan)
         fractal_b.append(np.nan)
@@ -112,6 +119,26 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
         mpf.make_addplot(fractal_b, type='scatter', markersize=fractal_marker_size, marker='^')
     )
 
+    # 线段
+    plot_segment: List[Tuple[str, float]] = []  # 线段
+
+    for i in range(len(segment_list)):
+        segment = segment_list[i]
+        fractal = segment.left_fractal
+
+        plot_segment.append(
+            (
+                df_origin.index[fractal.middle_candle.last_ordinary_idx],
+                fractal.extreme_price
+            )
+        )
+    plot_segment.append(
+        (
+            df_origin.index[segment_list[-1].right_fractal.middle_candle.last_ordinary_idx],
+            segment_list[-1].right_fractal.extreme_price
+        )
+    )
+
     # mplfinance 的配置
     mpf_config = {}
 
@@ -121,11 +148,16 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
         type='candle',
         volume=False,
         addplot=additional_plot,
-        alines=dict(alines=stroke, colors='k', linestyle='--', linewidths=0.05),
+        alines=dict(alines=[stroke, plot_segment],
+                    colors=['k', 'r'],
+                    linestyle='--',
+                    linewidths=0.05
+                    ),
         show_nontrading=False,
         figratio=(40, 20),
         figscale=2,
-        style=mpf_style,
+        style=style,
+        ylabel='',
         tight_layout=tight_layout,
         returnfig=True,
         return_width_config=mpf_config,
@@ -144,7 +176,7 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
     for idx in range(len(merged_candle_list)):
         candle = merged_candle_list[idx]
 
-        if candle.idx_first_ordinary_candle > count:
+        if candle.first_ordinary_idx > count:
             break
 
         if not show_all_merged and candle.period == 1:
@@ -152,7 +184,7 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
         candle_chan.append(
             Rectangle(
                 xy=(
-                    candle.idx_first_ordinary_candle - candle_width / 2,
+                    candle.first_ordinary_idx - candle_width / 2,
                     candle.low
                 ),
                 width=candle.period - 1 + candle_width,
@@ -211,7 +243,7 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
 
         for i in range(len(merged_candle_list)):
             candle = merged_candle_list[i]
-            idx_chan_x.append(candle.idx_last_ordinary_candle - candle_width / 2)
+            idx_chan_x.append(candle.last_ordinary_idx - candle_width / 2)
             idx_chan_y.append(candle.high + 14)
             idx_chan_value.append(str(merged_candle_list.index(candle)))
 
@@ -229,3 +261,41 @@ def plot_theory_of_chan_2(df_origin: pd.DataFrame,
     ax1.autoscale_view()
 
     print('Plot done.')
+
+
+def plot_pure_merged_candle(merged_candle_list: MergedCandleList,
+                            count: int):
+    style = get_plot_style()
+
+    df: pd.DataFrame = pd.DataFrame(
+        {
+            'open': 0.0,
+            'high': 0.0,
+            'low': 0.0,
+            'close': 0.0,
+        },
+        index=pd.Series(
+            range(
+                min(
+                    len(merged_candle_list),
+                    count
+                )
+            )
+        )
+    )
+    for idx in range(len(merged_candle_list)):
+        df.iloc[idx].at['open'] = merged_candle_list[idx].low
+        df.iloc[idx].at['low'] = merged_candle_list[idx].low
+        df.iloc[idx].at['high'] = merged_candle_list[idx].high
+        df.iloc[idx].at['close'] = merged_candle_list[idx].high
+
+    mpf.plot(
+        df,
+        type='candle',
+        volume=False,
+        show_nontrading=False,
+        figratio=(40, 20),
+        figscale=2,
+        style=style,
+        warn_too_much_data=1000
+    )

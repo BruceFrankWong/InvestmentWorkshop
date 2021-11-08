@@ -77,9 +77,10 @@ def generate_fractal(merged_candle_list: MergedCandleList,
             if debug:
                 print(
                     f'\n'
-                    f'  丢弃分型：\n'
+                    f'  ○ 丢弃分型：\n'
                     f'    当前缠论K线的{extreme_type}({candle_price})达到或超越了与前分型'
-                    f'（idx = {fractal_list.index(last_fractal)}，'
+                    f'（分型 idx = {fractal_list.index(last_fractal)}，'
+                    f'普通K线 idx = {last_fractal.middle_candle.last_ordinary_idx}，'
                     f'type = {last_fractal.type_}）的极值（{fractal_price}），'
                     f'丢弃前分型。\n'
                 )
@@ -94,7 +95,7 @@ def generate_fractal(merged_candle_list: MergedCandleList,
     # --------------------
     # 生成 分型。
     # --------------------
-    new_fractal: Optional[Fractal]
+    new_fractal: Optional[Fractal] = None
 
     left_candle = merged_candle_list[-3]
     middle_candle = merged_candle_list[-2]
@@ -102,6 +103,7 @@ def generate_fractal(merged_candle_list: MergedCandleList,
 
     if middle_candle.high > left_candle.high and middle_candle.high > right_candle.high:
         new_fractal = Fractal(
+            idx=fractal_count,
             type_=FractalType.Top,
             is_confirmed=False,
             left_candle=left_candle,
@@ -110,14 +112,13 @@ def generate_fractal(merged_candle_list: MergedCandleList,
         )
     elif middle_candle.low < left_candle.low and middle_candle.low < right_candle.low:
         new_fractal = Fractal(
+            idx=fractal_count,
             type_=FractalType.Bottom,
             is_confirmed=False,
             left_candle=left_candle,
             middle_candle=middle_candle,
             right_candle=right_candle
         )
-    else:
-        new_fractal = None
 
     if new_fractal is not None:
 
@@ -127,10 +128,9 @@ def generate_fractal(merged_candle_list: MergedCandleList,
             if debug:
                 print(
                     f'\n'
-                    f'  生成分型：\n'
-                    f'    第 {fractal_count + 1} 个分型，type = {new_fractal.type_.value}。\n'
-                    f'    缠论K线 idx = {merged_candle_list.index(middle_candle)}，'
-                    f'普通K线 idx = {middle_candle.idx_last_ordinary_candle}。'
+                    f'  ○ 生成分型：\n'
+                    f'    第 {fractal_count + 1} 个分型，type = {new_fractal.type_.value}，'
+                    f'普通K线 idx = {middle_candle.last_ordinary_idx}。\n'
                 )
 
         # 这不是第1个分型：
@@ -144,17 +144,16 @@ def generate_fractal(merged_candle_list: MergedCandleList,
                 right_fractal=new_fractal,
                 merged_candle_list=merged_candle_list
             )
-            if distance >= 4 and new_fractal.type_ != last_fractal.type_:
+            if distance >= 4:   # and new_fractal.type_ != last_fractal.type_:
                 last_fractal.is_confirmed = True
                 result.append(new_fractal)
 
                 if debug:
                     print(
                         f'\n'
-                        f'  生成分型：\n'
-                        f'    第 {fractal_count + 1} 个分型，type = {new_fractal.type_.value}。\n'
-                        f'    缠论K线 idx = {merged_candle_list.index(middle_candle)}，'
-                        f'普通K线 idx = {middle_candle.idx_last_ordinary_candle}。'
+                        f'  ○ 生成分型：\n'
+                        f'    第 {fractal_count + 1} 个分型，type = {new_fractal.type_.value}，'
+                        f'普通K线 idx = {middle_candle.last_ordinary_idx}。\n'
                     )
 
     return result

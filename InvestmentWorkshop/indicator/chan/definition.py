@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Tuple
+from typing import List, Optional
 from enum import Enum
 from dataclasses import dataclass
 
@@ -36,47 +36,86 @@ class OrdinaryCandle:
 
 @dataclass
 class MergedCandle(OrdinaryCandle):
+    idx: int
     period: int
-    idx_first_ordinary_candle: int
+    first_ordinary_idx: int
 
     @property
-    def idx_last_ordinary_candle(self) -> int:
-        return self.idx_first_ordinary_candle + self.period - 1
+    def last_ordinary_idx(self) -> int:
+        return self.first_ordinary_idx + self.period - 1
 
 
 @dataclass
-class Fractal:
+class InterimFractal:
     type_: FractalType
-    is_confirmed: bool
-    left_candle: MergedCandle
     middle_candle: MergedCandle
-    right_candle: MergedCandle
 
     @property
-    def extreme(self) -> float:
+    def extreme_price(self) -> float:
         return self.middle_candle.high if self.type_ == FractalType.Top else self.middle_candle.low
 
     def __str__(self) -> str:
-        return f'Fractal ({self.type_.value}, ' \
-               f'idx = {self.middle_candle.idx_last_ordinary_candle}, ' \
+        return f'InterimFractal ({self.type_.value}, ' \
+               f'ordinary idx = {self.middle_candle.last_ordinary_idx}, ' \
                f'range = {self.middle_candle.high} ~ {self.middle_candle.low})'
 
 
 @dataclass
-class FractalFirst:
-    type_: FractalType
-    middle: MergedCandle
-    right: MergedCandle
+class Fractal(InterimFractal):
+    idx: int
+    is_confirmed: bool
+    left_candle: MergedCandle
+    right_candle: MergedCandle
+
+    def __str__(self) -> str:
+        return f'Fractal ({self.type_.value}, ' \
+               f'ordinary idx = {self.middle_candle.last_ordinary_idx}, ' \
+               f'range = {self.middle_candle.high} ~ {self.middle_candle.low})'
 
 
 @dataclass
-class FractalLast:
-    type_: FractalType
-    left: MergedCandle
-    middle: MergedCandle
+class LinearElement:
+    idx: int
+    type_: str
+    trend: TrendType
+    left_fractal: Fractal
+    right_fractal: Fractal
+    fractals: List[Fractal]
+
+    @property
+    def left_price(self) -> float:
+        return self.left_fractal.extreme_price
+
+    @property
+    def right_price(self) -> float:
+        return self.right_fractal.extreme_price
+
+    @property
+    def period(self) -> int:
+        return self.right_fractal.middle_candle.last_ordinary_idx - \
+               self.left_fractal.middle_candle.last_ordinary_idx
+
+    @property
+    def price_range(self) -> float:
+        return self.right_fractal.extreme_price - self.left_fractal.extreme_price
+
+    @property
+    def slope(self) -> float:
+        return self.price_range / self.period
+
+    def __str__(self) -> str:
+        return f'<LinearElement (type={self.type_}, id={self.idx}, trend={self.trend.value}, ' \
+               f'ordinary idx = {self.left_fractal.middle_candle.last_ordinary_idx} ~ ' \
+               f'{self.right_fractal.middle_candle.last_ordinary_idx})>'
 
 
-OrdinaryCandleList = List[OrdinaryCandle]
-MergedCandleList = List[MergedCandle]
-FractalList = List[Fractal]
-StrokeList = List[Tuple[str, str]]
+class LinearElementMode(Enum):
+    UDU = '上下上'
+    DUD = '下上下'
+
+
+OrdinaryCandleList = List[OrdinaryCandle]   # 普通K线序列
+MergedCandleList = List[MergedCandle]       # 已合并K线序列
+FractalList = List[Fractal]                 # 分型序列
+StrokeList = List[LinearElement]            # 笔序列
+SegmentList = List[LinearElement]           # 线段序列

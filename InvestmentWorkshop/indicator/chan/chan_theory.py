@@ -13,9 +13,11 @@ from .definition import (
     MergedCandle,
     MergedCandleList,
     FractalList,
+    SegmentList,
 )
 from .merge_candle import merge_candle
 from .generate_fractal import generate_fractal
+from .segment import generate_segment
 from .debug import (
     print_debug_before,
     print_debug_after,
@@ -24,7 +26,9 @@ from .debug import (
 
 def theory_of_chan_2(df_origin: pd.DataFrame,
                      count: int = None,
-                     debug: bool = False) -> Tuple[MergedCandleList, FractalList]:
+                     debug: bool = False) -> Tuple[MergedCandleList,
+                                                   FractalList,
+                                                   SegmentList]:
     """
     缠论。
 
@@ -42,9 +46,12 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
     # 声明变量类型。
     candle_current: OrdinaryCandle
     candle_previous: MergedCandle  # 最新缠论K线
+    merged_candle_count: int  # 缠论K线数量
+
+    # 初始化
     merged_candle_list: MergedCandleList = []
     fractal_list: FractalList = []
-    merged_candle_count: int  # 缠论K线数量
+    segment_list: SegmentList = []
 
     # 转化化 df_origin。
     df_data: pd.DataFrame = df_origin.reset_index()
@@ -55,11 +62,12 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
         low=df_data.loc[0, 'low'].copy(),
     )
     candle_previous = MergedCandle(
-            high=candle_current.high,
-            low=candle_current.low,
-            period=1,
-            idx_first_ordinary_candle=0
-        )
+        idx=0,
+        high=candle_current.high,
+        low=candle_current.low,
+        period=1,
+        first_ordinary_idx=0
+    )
     merged_candle_list.append(
         candle_previous
     )
@@ -99,7 +107,7 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
 
         # 合并K线。
         merged_candle_list = merge_candle(
-            chan_candle_list=merged_candle_list,
+            merged_candle_list=merged_candle_list,
             ordinary_candle=candle_current,
             debug=debug
         )
@@ -111,6 +119,12 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
             debug=debug
         )
 
+        segment_list = generate_segment(
+            segment_list=segment_list,
+            fractal_list=fractal_list,
+            debug=debug
+        )
+
         # ----------------------------------------
         # 打印 debug 信息。
         # ----------------------------------------
@@ -118,6 +132,7 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
             print_debug_after(
                 candle_list=merged_candle_list,
                 fractal_list=fractal_list,
+                segment_list=segment_list,
                 base_time=time_start
             )
 
@@ -126,4 +141,4 @@ def theory_of_chan_2(df_origin: pd.DataFrame,
     if debug:
         print(f'\n计算完成！\n总计花费： {time_end - time_start}')
 
-    return merged_candle_list, fractal_list
+    return merged_candle_list, fractal_list, segment_list
