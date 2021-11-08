@@ -6,6 +6,7 @@ __author__ = 'Bruce Frank Wong'
 from typing import List, Tuple, Optional
 from enum import Enum
 from dataclasses import dataclass
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -67,6 +68,11 @@ class MergedCandle(OrdinaryCandle):
     def last_ordinary_idx(self) -> int:
         return self.first_ordinary_idx + self.period - 1
 
+    def __str__(self) -> str:
+        return f'MergedCandle (idx={self.idx}, period={self.period}, ' \
+               f'first_ordinary_idx={self.first_ordinary_idx}, ' \
+               f'price_high={self.high}, price_low={self.low})'
+
 
 @dataclass
 class Fractal:
@@ -89,9 +95,10 @@ class Fractal:
         return self.middle_candle.last_ordinary_idx
 
     def __str__(self) -> str:
-        return f'Fractal ({self.pattern.value}, {self.function.value}, ' \
-               f'ordinary idx = {self.ordinary_idx}, ' \
-               f'extreme price = {self.extreme_price})'
+        return f'Fractal (idx={self.idx}, ' \
+               f'pattern={self.pattern.value}, function={self.function.value}, ' \
+               f'ordinary_idx={self.ordinary_idx}, ' \
+               f'extreme_price={self.extreme_price})'
 
 
 @dataclass
@@ -128,6 +135,11 @@ class Stroke:
     @property
     def slope(self) -> float:
         return self.price_range / self.period
+
+    def __str__(self) -> str:
+        return f'Stroke (idx={self.idx}, trend={self.trend.value}, ' \
+               f'left_ordinary_idx={self.left_ordinary_idx}, ' \
+               f'right_ordinary_idx={self.right_ordinary_idx})'
 
 
 @dataclass
@@ -211,6 +223,10 @@ class ChanTheory:
         return len(self._merged_candles)
 
     @property
+    def merged_candles(self) -> List[MergedCandle]:
+        return deepcopy(self._merged_candles)
+
+    @property
     def count_fractals(self) -> int:
         """
         Count of the fractals list.
@@ -218,6 +234,10 @@ class ChanTheory:
         :return:
         """
         return len(self._fractals)
+
+    @property
+    def fractals(self) -> List[Fractal]:
+        return deepcopy(self._fractals)
 
     @property
     def count_strokes(self) -> int:
@@ -229,6 +249,10 @@ class ChanTheory:
         return len(self._strokes)
 
     @property
+    def strokes(self) -> List[Stroke]:
+        return deepcopy(self._strokes)
+
+    @property
     def count_segments(self) -> int:
         """
         Count of the segments list.
@@ -236,6 +260,10 @@ class ChanTheory:
         :return:
         """
         return len(self._segments)
+
+    @property
+    def segments(self) -> List[Segment]:
+        return deepcopy(self._segments)
 
     @property
     def count_pivots(self) -> int:
@@ -778,10 +806,13 @@ class ChanTheory:
 
     def run_with_dataframe(self, df: pd.DataFrame, count: int = 0):
         count = len(df) if count == 0 else count
+        width: int = len(str(count - 1)) + 1
         for idx in range(count):
+            if self._debug:
+                print(f'\n【第 {idx:>{width}} / {count - 1:>{width}} 轮】（按普通K线编号）\n')
             self.run_step_by_step(
-                high=df.loc[idx, 'high'].copy(),
-                low=df.loc[idx, 'low'].copy()
+                high=df.iloc[idx].at['high'].copy(),
+                low=df.iloc[idx].at['low'].copy()
             )
 
     def plot(self,
@@ -872,7 +903,7 @@ class ChanTheory:
 
         for i in range(self.count_fractals):
             fractal = self._fractals[i]
-            idx_fractal_to_ordinary = fractal.middle_candle.last_ordinary_idx
+            idx_fractal_to_ordinary = fractal.ordinary_idx
             idx_fractal_to_df = df.index[idx_fractal_to_ordinary]
             stroke.append(
                 (
