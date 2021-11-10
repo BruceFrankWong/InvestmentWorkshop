@@ -338,11 +338,11 @@ class ChanTheory:
         """
 
         # debug message.
-        msg_generated: str = '\n  ○ 生成K线：\n    第 {idx} 根合并K线，' \
-                             '起始（普通K线 idx） = {ordinary_idx}，周期 = {period}，' \
+        msg_generated: str = '\n  ● 生成K线：\n    第 {id} 根合并K线，' \
+                             '起始idx（普通K线）= {ordinary_idx}，周期 = {period}，' \
                              '高点 = {high}，低点 = {low}。\n'
-        msg_merged: str = '\n  ○ 合并K线：\n    第 {idx} 根合并K线，' \
-                          '起始（普通K线 idx） = {ordinary_idx}，周期 = {period}，' \
+        msg_merged: str = '\n  ● 合并K线：\n    第 {id} 根合并K线，' \
+                          '起始 idx（普通K线）= {ordinary_idx}，周期 = {period}，' \
                           '高点 = {high}，低点 = {low}。\n'
 
         # 申明变量类型并赋值。
@@ -463,7 +463,7 @@ class ChanTheory:
             if self._log:
                 print(
                     msg_generated.format(
-                        idx=new_merged_candle.id,
+                        id=new_merged_candle.id + 1,
                         ordinary_idx=new_merged_candle.right_ordinary_idx,
                         period=new_merged_candle.period,
                         high=new_merged_candle.high,
@@ -477,7 +477,7 @@ class ChanTheory:
             if self._log:
                 print(
                     msg_merged.format(
-                        idx=new_merged_candle.id,
+                        id=new_merged_candle.id + 1,
                         ordinary_idx=new_merged_candle.right_ordinary_idx,
                         period=new_merged_candle.period,
                         high=new_merged_candle.high,
@@ -498,8 +498,8 @@ class ChanTheory:
             return False
 
         # debug message.
-        msg_generated: str = '\n  ○ 生成分型：\n' \
-                             '    第 {id} 个分型，模式 = {pattern}，普通K线 idx = {ordinary_idx}。'
+        msg_generated: str = '\n  ● 生成分型：\n' \
+                             '    第 {id} 个分型，模式 = {pattern}，idx（普通K线）= {ordinary_idx}。'
 
         # 声明变量类型且赋值。
         new_fractal: Optional[Fractal]
@@ -550,7 +550,7 @@ class ChanTheory:
             if self._log:
                 print(
                     msg_generated.format(
-                        id=new_fractal.id,
+                        id=new_fractal.id + 1,
                         pattern=new_fractal.pattern.value,
                         ordinary_idx=new_fractal.ordinary_idx
                     )
@@ -571,10 +571,10 @@ class ChanTheory:
             return False
 
         # debug message
-        msg_generate: str = '\n  ○ 生成笔：\n    第 {id} 根笔，趋势 = {trend}，' \
-                            '起点（普通K线 idx） = {left}，终点（普通K线 idx） = {right}。\n'
-        msg_extend: str = '\n  ○ 延伸笔：\n    第 {id} 根笔，趋势 = {trend}，' \
-                          '原终点起点（普通K线 idx） = {old}，现终点（普通K线 idx） = {new}。\n'
+        msg_generate: str = '\n  ● 生成笔：\n    第 {id} 根笔，趋势 = {trend}，' \
+                            '起点 idx（普通K线 ）= {left}，终点 idx（普通K线）= {right}。\n'
+        msg_extend: str = '\n  ● 延伸笔：\n    第 {id} 根笔，趋势 = {trend}，' \
+                          '原终点 idx（普通K线）= {old}，现终点 idx（普通K线）= {new}。\n'
 
         # 如果 笔的数量 == 0：
         #     向前穷举 fractal_p2，如果：
@@ -591,18 +591,18 @@ class ChanTheory:
 
             if self._debug:
                 print(
-                    f'\n  ■ 尝试生成笔：目前共有分型 {self.count_fractals} 个。'
-                    f'\n    分型1，id = {last_fractal.id}，'
-                    f'普通K线 idx = {last_fractal.middle_candle.id}'
+                    f'\n  ○ 尝试生成笔：目前共有分型 {self.count_fractals} 个。\n'
+                    f'    右分型，id = {last_fractal.id}，pattern = {last_fractal.pattern.value}，'
+                    f'idx（普通K线）= {last_fractal.middle_candle.id}'
                 )
             for i in range(0, last_fractal.id):
                 fractal_p2 = self._fractals[i]
                 distance = last_fractal.middle_candle.id - fractal_p2.middle_candle.id
                 if self._debug:
                     print(
-                        f'    i = {i}：\n'
-                        f'      分型2，id = {fractal_p2.id}，'
-                        f'普通K线 idx = {fractal_p2.middle_candle.id}，距离 = {distance}'
+                        f'    左分型，id = {fractal_p2.id}，pattern = {fractal_p2.pattern.value}，'
+                        f'idx（普通K线）= {fractal_p2.middle_candle.id}，距离 = {distance}，'
+                        f'{"满足" if distance >= self._minimum_distance else "不满足"}'
                     )
                 if distance >= self._minimum_distance and \
                         fractal_p2.pattern != last_fractal.pattern:
@@ -618,7 +618,7 @@ class ChanTheory:
                     if self._log:
                         print(
                             msg_generate.format(
-                                id=new_stroke.id,
+                                id=new_stroke.id + 1,
                                 trend=new_stroke.trend,
                                 left=new_stroke.left_ordinary_idx,
                                 right=new_stroke.right_ordinary_idx
@@ -646,7 +646,7 @@ class ChanTheory:
 
             if self._debug:
                 print(
-                    f'\n  ■ 尝试延伸笔：目前共有分型 {self.count_fractals} 个。'
+                    f'\n  ○ 尝试顺向延伸笔：目前共有分型 {self.count_fractals} 个。'
                     f'\n    最新笔   id = {last_stroke.id}，{last_stroke.trend}，'
                     f'右侧价 = {last_stroke.right_price}，'
                     f'\n    最新分型 id = {last_fractal.id}，{last_fractal.pattern}，'
@@ -666,7 +666,7 @@ class ChanTheory:
                 if self._log:
                     print(
                         msg_extend.format(
-                            id=last_stroke.id,
+                            id=last_stroke.id + 1,
                             trend=last_stroke.trend,
                             old=last_stroke.right_ordinary_idx,
                             new=last_fractal.middle_candle.right_ordinary_idx
@@ -692,13 +692,12 @@ class ChanTheory:
 
             if self._debug:
                 print(
-                    f'\n  ■ 尝试生成（反向）笔：目前共有分型 {self.count_fractals} 个。'
+                    f'\n  ○ 尝试反向生成笔：目前共有分型 {self.count_fractals} 个。'
                     f'\n    最新笔   id = {last_stroke.id}，{last_stroke.trend}，'
                     f'右侧分型 id= {last_stroke.right_fractal.id}，'
                     f'idx = {last_stroke.right_ordinary_idx}'
                     f'\n    最新分型 id = {last_fractal.id}，{last_fractal.pattern}，'
-                    f'idx = {last_fractal.ordinary_idx}'
-                    f'\n    距离 = {distance}'
+                    f'idx = {last_fractal.ordinary_idx}，距离 = {distance}'
                 )
 
             if (
@@ -733,7 +732,7 @@ class ChanTheory:
                 if self._log:
                     print(
                         msg_generate.format(
-                            id=new_stroke.id,
+                            id=new_stroke.id + 1,
                             trend=new_stroke.trend,
                             left=new_stroke.left_fractal.middle_candle.right_ordinary_idx,
                             right=new_stroke.right_fractal.middle_candle.right_ordinary_idx
@@ -755,23 +754,10 @@ class ChanTheory:
             return False
 
         # debug message
-        msg_generate: str = '\n  ○ 生成线段：\n    第 {id} 根线段，趋势 = {trend}，' \
+        msg_generate: str = '\n  ● 生成线段：\n    第 {id} 根线段，趋势 = {trend}，' \
                             '起点（普通K线 idx） = {left}，终点（普通K线 idx） = {right}。\n'
-        msg_extend: str = '\n  ○ 延伸线段：\n    第 {id} 根线段，趋势 = {trend}，' \
+        msg_extend: str = '\n  ● 延伸线段：\n    第 {id} 根线段，趋势 = {trend}，' \
                           '原终点起点（普通K线 idx） = {old}，现终点（普通K线 idx） = {new}。\n'
-
-        # 申明变量类型并赋值。
-        is_changed: bool = False
-        is_extended: bool = False
-        is_generated: bool = False
-
-        # 声明变量类型
-        new_segment: Optional[Segment] = None
-        last_segment: Optional[Segment] = self._segments[-1] if self.count_segments > 0 else None
-        stroke_p1: Stroke = self._strokes[-1]
-        stroke_p3: Stroke = self._strokes[-3]
-        overlap_high: float  # 重叠区间左值
-        overlap_low: float  # 重叠区间右值
 
         # 如果 线段的数量 == 0：
         #     向前穷举 stroke_p3，如果：
@@ -780,7 +766,7 @@ class ChanTheory:
         if self.count_segments == 0:
 
             # 申明变量类型并赋值。
-            new_segment: Segment
+            new_segment: Optional[Segment] = None
             stroke_p1: Stroke = self._strokes[-1]
             stroke_p3: Stroke
             overlap_high: float = 0.0   # 重叠区间高值
@@ -788,14 +774,17 @@ class ChanTheory:
 
             if self._debug:
                 print(
-                    f'\n  ■ 尝试生成线段：'
+                    f'\n  ○ 尝试生成线段：'
                     f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。'
-                    f'\n    前1笔，id = {stroke_p1.id}，'
+                    f'\n    向前（左）第1根笔，id = {stroke_p1.id}，'
                     f'high = {max(stroke_p1.left_price, stroke_p1.right_price)}，'
                     f'low = {min(stroke_p1.left_price, stroke_p1.right_price)}'
                 )
             for i in range(0, stroke_p1.id - 1):
                 stroke_p3 = self._strokes[i]
+
+                # 如果 前1笔 的趋势与 前3笔 不一致，重新循环。
+                # （理论上不可能，但是留做保险。）
                 if stroke_p3.trend != stroke_p1.trend:
                     continue
 
@@ -841,21 +830,23 @@ class ChanTheory:
 
                 if self._debug:
                     print(
-                        f'    i = {i}：\n'
-                        f'      前3笔，id = {stroke_p3.id}，'
+                        f'    向前（左）第{stroke_p1.id - stroke_p3.id + 1}根笔，id = {stroke_p3.id}，'
                         f'high = {max(stroke_p3.left_price, stroke_p3.right_price)}，'
                         f'low = {min(stroke_p3.left_price, stroke_p3.right_price)}，'
                         f'overlap high = {overlap_high}，overlap low = {overlap_low}'
                     )
 
+                # new_segment = self._generate_segment(stroke_p3, stroke_p1)
+
                 if overlap_high > overlap_low:
 
                     new_segment = Segment(
                         id=self.count_segments,
-                        trend=Trend.Bullish,
+                        trend=Trend.Bullish if stroke_p1.trend == Trend.Bullish else Trend.Bearish,
                         left_stroke=stroke_p3,
                         right_stroke=stroke_p1
                     )
+                if new_segment:
                     self._segments.append(new_segment)
 
                     if self._log:
@@ -871,109 +862,153 @@ class ChanTheory:
                     return True
 
         # 如果 线段数量 >= 1：
-        if self.count_segments >= 1:
-
-            # --------------------
-            # 生成（反转）线段
-            # --------------------
-            # 如果 最新笔 idx - 最新线段右侧笔 idx == 2：
-            if stroke_p1.id - last_segment.right_stroke.id == 2:
-                # 如果：
-                #     1. 上升线段 且
-                #     2. stroke_p1 的右值 >= 线段右值：
-                # 顺向突破，延伸线段。
-                if last_segment.trend == Trend.Bullish and \
-                        stroke_p1.right_price >= last_segment.right_price:
-                    is_extended = True
-
-                # 如果：
-                #     1. 下降线段 且
-                #     2. stroke_p1 的右值 <= 线段右值：
-                # 顺向突破，延伸线段。
-                if last_segment.trend == Trend.Bearish and \
-                        stroke_p1.right_price <= last_segment.right_price:
-                    is_extended = True
-
-            # 如果是 最新笔 idx - 最新线段右侧笔 idx == 3：
-            if stroke_p1.id - last_segment.right_stroke.id == 3:
-                # 如果：
-                #     1. 上升线段 且
-                #     2. 前第1笔 笔右侧值 < 前第3笔 笔右侧值 或
-                #     3A. 前第1笔 笔右侧值 < 线段最后一笔的左值 或
-                #     3B. 前第3笔 笔右侧值 < 线段最后一笔的左值:
-                # 反转击穿，反转线段。
-                if last_segment.trend == Trend.Bullish:
-                    if stroke_p1.right_price < stroke_p3.right_price:
-                        is_generated = True
-                    elif stroke_p1.right_price <= last_segment.right_stroke.left_price and \
-                            stroke_p3.right_price <= last_segment.right_stroke.left_price:
-                        is_generated = True
-
-                # 如果：
-                #     1. 下降线段
-                #     2. 前第3笔 笔右侧值 > 线段右侧笔的左侧值
-                #     2. 前第1笔 笔右侧值 > 线段右侧笔的左侧值
-                # 反转击穿。
-                if last_segment.trend == Trend.Bearish:
-                    if stroke_p1.right_price > stroke_p3.right_price:
-                        is_generated = True
-                    elif stroke_p1.right_price >= last_segment.right_stroke.left_price and \
-                            stroke_p3.right_price >= last_segment.right_stroke.left_price:
-                        is_generated = True
-
-        # stroke_p3 是 上升趋势：
-        if stroke_p3.trend == Trend.Bullish:
-
-            # 检测重叠区间
-            overlap_high = min(stroke_p3.right_price, stroke_p1.right_price)
-            overlap_low = max(stroke_p3.left_price, stroke_p1.left_price)
-
-            if overlap_high > overlap_low:
-                is_generated = True
-                new_segment = Segment(
-                    id=self.count_segments,
-                    trend=Trend.Bullish,
-                    left_stroke=stroke_p3,
-                    right_stroke=stroke_p1
-                )
-
-        # stroke_p3 是 下降趋势：
         else:
+            last_segment: Segment = self._segments[-1]
 
-            # 检测重叠区间
-            overlap_high = min(stroke_p3.left_price, stroke_p1.left_price)
-            overlap_low = max(stroke_p3.right_price, stroke_p1.right_price)
+            # 在 笔数量 - 最后线段的右侧笔 id >= 1 时：
+            if self.count_strokes - last_segment.right_stroke.id >= 1:
 
-            if overlap_high > overlap_low:
-                is_generated = True
-                new_segment = Segment(
-                    id=self.count_segments,
-                    trend=Trend.Bearish,
-                    left_stroke=stroke_p3,
-                    right_stroke=stroke_p1
-                )
-
-        if new_segment is not None:
-            # 如果 线段数量 == 0： 加入列表。
-            if self.count_segments == 0:
-                self._segments.append(
-                    new_segment
-                )
-                is_changed = True
-                if self._log:
+                if self._debug:
                     print(
-                        msg_generate.format(
-                            count=self.count_segments,
-                            trend=new_segment.trend,
-                            left=new_segment.left_ordinary_idx,
-                            right=new_segment.right_ordinary_idx
-                        )
+                        f'\n  ○ 尝试修正线段：'
+                        f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。'
+                        f'\n    最新线段的右侧笔 id = {last_segment.right_stroke.id}，'
+                        f'trend = {last_segment.right_stroke.trend}，'
+                        f'high = {max(last_segment.left_price, last_segment.right_price)}，'
+                        f'low = {min(last_segment.left_price, last_segment.right_price)}'
                     )
-        if is_generated:
-            is_changed = True
-        if is_extended:
-            is_changed = True
-        return is_changed
+
+                for i in range(last_segment.right_stroke.id + 1, self.count_strokes):
+
+                    stroke_n2: Stroke
+                    if i + 1 < self.count_strokes:
+                        stroke_n2 = self._strokes[i + 1]
+                    else:
+                        break
+
+                    if self._debug:
+                        print(
+                            f'    尝试顺向延伸线段：\n'
+                            f'        笔 id = {stroke_n2.id}，trend = {stroke_n2.trend}，'
+                            f'high = {max(stroke_n2.left_price, stroke_n2.right_price)}，'
+                            f'low = {min(stroke_n2.left_price, stroke_n2.right_price)}'
+                        )
+
+                    # 如果：
+                    #     A1. 上升线段，且
+                    #     A2. 线段后第2笔 是 上升笔，且
+                    #     A3. 线段后第2笔的右侧价 >= 线段右侧价
+                    #   或
+                    #     B1. 下降线段，且
+                    #     B2. 线段后第2笔 是 下降笔，且
+                    #     B3. 线段后第2笔的右侧价 <= 线段右侧价
+                    # 延伸线段。
+                    if stroke_n2 is not None and \
+                            (
+                                    last_segment.trend == Trend.Bullish and
+                                    stroke_n2.trend == Trend.Bullish and
+                                    stroke_n2.right_price >= last_segment.right_price
+                            ) or \
+                            (
+                                    last_segment.trend == Trend.Bearish and
+                                    stroke_n2.trend == Trend.Bearish and
+                                    stroke_n2.right_price <= last_segment.right_price
+                            ):
+
+                        if self._log:
+                            print(
+                                msg_extend.format(
+                                    id=last_segment.id,
+                                    trend=last_segment.trend,
+                                    old=last_segment.right_ordinary_idx,
+                                    new=stroke_n2.right_ordinary_idx
+                                )
+                            )
+                        last_segment.right_stroke = stroke_n2
+
+                        return True
+
+                    stroke_n1: Stroke = self._strokes[i]
+                    stroke_n3: Stroke
+                    if i + 2 < self.count_strokes:
+                        stroke_n3 = self._strokes[i + 2]
+                    else:
+                        break
+
+                    if self._debug:
+                        print(
+                            f'    尝试反向生成线段：\n'
+                            f'        笔 id = {stroke_n1.id}，trend = {stroke_n1.trend}，'
+                            f'high = {max(stroke_n1.left_price, stroke_n1.right_price)}，'
+                            f'low = {min(stroke_n1.left_price, stroke_n1.right_price)}\n'
+                            f'        笔 id = {stroke_n3.id}，trend = {stroke_n3.trend}，'
+                            f'high = {max(stroke_n3.left_price, stroke_n3.right_price)}，'
+                            f'low = {min(stroke_n3.left_price, stroke_n3.right_price)}\n'
+                        )
+
+                    # 如果：
+                    #     A1. 上升线段，且
+                    #         A2A. 线段后第1笔的右侧价 <= 线段右侧笔的左侧价，且
+                    #         A2B. 线段后第3笔的右侧价 <  线段右侧笔的左侧价
+                    #       或
+                    #         A3. 线段后第3笔的右侧价 <=  线段后第1笔的右侧价
+                    #   或
+                    #     B1. 下降线段，且
+                    #         B2A. 线段后第1笔的右侧价 >= 线段右侧笔的左侧价，且
+                    #         B2B. 线段后第3笔的右侧价 >  线段右侧笔的左侧价
+                    #       或
+                    #         B3. 线段后第2笔的右侧价 >= 线段后第1笔的右侧价
+                    # 生成反向线段。
+                    if stroke_n3 is not None and \
+                            (
+                                    last_segment.trend == Trend.Bullish and
+                                    stroke_n3.trend == Trend.Bearish and
+                                    (
+                                            stroke_n3.right_price <= stroke_n1.right_price or
+                                            (
+                                                    stroke_n1.right_price
+                                                    <= last_segment.right_stroke.left_price
+                                                    and
+                                                    stroke_n3.right_price
+                                                    < last_segment.right_stroke.left_price
+                                            )
+                                    )
+                            ) or (
+                                    last_segment.trend == Trend.Bearish and
+                                    stroke_n3.trend == Trend.Bullish and
+                                    (
+                                            stroke_n3.right_price >= stroke_n1.right_price or
+                                            (
+                                                    stroke_n1.right_price
+                                                    >= last_segment.right_stroke.left_price
+                                                    and
+                                                    stroke_n3.right_price
+                                                    > last_segment.right_stroke.left_price
+                                            )
+                                    )
+                            ):
+                        new_segment = Segment(
+                            id=self.count_segments,
+                            trend=Trend.Bullish if stroke_n3.trend == Trend.Bullish
+                            else Trend.Bearish,
+                            left_stroke=stroke_n1,
+                            right_stroke=stroke_n3
+                        )
+                        self._segments.append(new_segment)
+
+                        if self._log:
+                            print(
+                                msg_generate.format(
+                                    id=new_segment.id,
+                                    trend=new_segment.trend,
+                                    left=new_segment.left_ordinary_idx,
+                                    right=new_segment.right_ordinary_idx
+                                )
+                            )
+                        last_segment.right_stroke = self._strokes[stroke_n1.id - 1]
+
+                        return True
+        return False
 
     def generate_pivot(self):
         """
@@ -998,13 +1033,86 @@ class ChanTheory:
     def run_with_dataframe(self, df: pd.DataFrame, count: int = 0):
         working_count: int = len(df) if count == 0 else count
         width: int = len(str(working_count - 1)) + 1
+
         for idx in range(working_count):
+
             if self._log:
                 print(f'\n【第 {idx:>{width}} / {working_count - 1:>{width}} 轮】（按普通K线编号）')
+
             self.run_step_by_step(
                 high=df.iloc[idx].at['high'].copy(),
                 low=df.iloc[idx].at['low'].copy()
             )
+
+            if self._log:
+                print(f'\n  ■ 处理完毕。')
+
+                # 合并K线
+                print(f'\n    合并K线数量： {self.count_merged_candles}。')
+                for i in range(1, 4):
+                    if self.count_merged_candles >= i:
+                        candle = self._merged_candles[-i]
+                        print(
+                            f'      向前（左）第{i}根合并K线：'
+                            f'自 {candle.left_ordinary_idx} 至 {candle.right_ordinary_idx}，'
+                            f'周期 = {candle.period}；'
+                        )
+                    else:
+                        print(f'      向前（左）第{i}根合并K线：不存在；')
+
+                # 分型
+                print(f'\n    分型数量： {self.count_fractals}。')
+                for i in range(1, 3):
+                    if self.count_fractals >= i:
+                        fractal = self._fractals[-i]
+                        print(
+                            f'      向前（左）第{i}个分型：id = {fractal.id}，'
+                            f'pattern = {fractal.pattern.value}，'
+                            f'idx（普通K线）= {fractal.ordinary_idx}。'
+                        )
+                    else:
+                        print(f'      向前（左）第{i}个分型：不存在。')
+
+                # 笔
+                print(f'\n    笔数量： {self.count_strokes}。')
+                for i in range(1, 4):
+                    if self.count_strokes >= i:
+                        stroke = self._strokes[-i]
+                        print(
+                            f'      向前（左）第{i}个笔：id = {stroke.id}，trend = {stroke.trend.value}，'
+                            f'idx（普通K线）= '
+                            f'{stroke.left_ordinary_idx} ~ {stroke.right_ordinary_idx}，'
+                            f'price = {stroke.left_price} ~ {stroke.right_price}。'
+                        )
+                    else:
+                        print(f'      向前（左）第{i}个笔：不存在。')
+
+                # 线段
+                print(f'\n    线段数量： {self.count_segments}。')
+                for i in range(1, 4):
+                    if self.count_segments >= i:
+                        segment = self._segments[-i]
+                        print(
+                            f'      向前（左）第{i}个线段：id = {segment.id}，trend = {segment.trend.value}，'
+                            f'idx（普通K线）= '
+                            f'{segment.left_ordinary_idx} ~ {segment.right_ordinary_idx}，'
+                            f'price = {segment.left_price} ~ {segment.right_price}。'
+                        )
+                    else:
+                        print(f'      向前（左）第{i}个线段：不存在。')
+
+                # 中枢
+                print(f'\n    中枢数量： {self.count_pivots}。')
+                for i in range(1, 3):
+                    if self.count_pivots >= i:
+                        pivot = self._pivots[-i]
+                        print(
+                            f'      向前（左）第{i}个中枢：id = {pivot.id}，'
+                            f'idx（普通K线）= {pivot.left_ordinary_idx} ~ {pivot.right_ordinary_idx}，'
+                            f'price = {pivot.left_price} ~ {pivot.right_price}。'
+                        )
+                    else:
+                        print(f'      向前（左）第{i}个中枢：不存在。')
 
     def plot(self,
              df: pd.DataFrame,
