@@ -1010,14 +1010,21 @@ class ChanTheory:
                         return True
         return False
 
-    def generate_pivot(self):
+    def generate_pivot(self) -> bool:
         """
         Generate the pivots.
         :return:
         """
-        pass
+        return False
 
     def run_step_by_step(self, high: float, low: float):
+        """
+        Run step by step, with a pair of float.
+
+        :param high: float, the high price of new candle.
+        :param low:  float, the low price of new candle.
+        :return: None.
+        """
         ordinary_candle: OrdinaryCandle = OrdinaryCandle(
             high=high,
             low=low
@@ -1029,8 +1036,18 @@ class ChanTheory:
             is_changed = self.generate_stroke()
         if is_changed:
             is_changed = self.generate_segment()
+        if is_changed:
+            is_changed = self.generate_pivot()
 
-    def run_with_dataframe(self, df: pd.DataFrame, count: int = 0):
+    def run_with_dataframe(self, df: pd.DataFrame, count: int = 0) -> None:
+        """
+        Run with lots of data in pandas DataFrame format.
+
+        :param df:    pandas DataFrame. A series of bar data, the index should be DatetimeIndex,
+                      and the columns should contains open, high, low, close and volume.
+        :param count: int. How many rows of df should be calculate.
+        :return: None.
+        """
         working_count: int = len(df) if count == 0 else count
         width: int = len(str(working_count - 1)) + 1
 
