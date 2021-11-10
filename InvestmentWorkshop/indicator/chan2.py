@@ -192,6 +192,17 @@ class Segment:
 
 
 @dataclass
+class IsolationLine:
+    id: int
+    candle: MergedCandle
+
+    def __str__(self) -> str:
+        return f'IsolationLine (id={self.id}, ' \
+               f'merged candle id={self.candle.id}, ' \
+               f'ordinary_idx={self.candle.right_ordinary_idx})'
+
+
+@dataclass
 class Pivot:
     id: int
     left: Fractal
@@ -246,7 +257,9 @@ class ChanTheory:
     _fractals: List[Fractal]
     _strokes: List[Stroke]
     _segments: List[Segment]
-    _pivots: List[Pivot]
+    _isolation_lines: List[IsolationLine]
+    _stroke_pivots: List[Pivot]
+    _segment_pivots: List[Pivot]
 
     def __init__(self, strict: bool = True, log: bool = False, debug: bool = False):
         """
@@ -265,7 +278,9 @@ class ChanTheory:
         self._fractals = []
         self._strokes = []
         self._segments = []
-        self._pivots = []
+        self._isolation_lines = []
+        self._stroke_pivots = []
+        self._segment_pivots = []
 
     @property
     def count_merged_candles(self) -> int:
@@ -278,6 +293,11 @@ class ChanTheory:
 
     @property
     def merged_candles(self) -> List[MergedCandle]:
+        """
+        The merged candle list.
+
+        :return:
+        """
         return deepcopy(self._merged_candles)
 
     @property
@@ -291,6 +311,11 @@ class ChanTheory:
 
     @property
     def fractals(self) -> List[Fractal]:
+        """
+        The fractal list.
+
+        :return:
+        """
         return deepcopy(self._fractals)
 
     @property
@@ -304,6 +329,11 @@ class ChanTheory:
 
     @property
     def strokes(self) -> List[Stroke]:
+        """
+        The stroke list.
+
+        :return:
+        """
         return deepcopy(self._strokes)
 
     @property
@@ -317,16 +347,66 @@ class ChanTheory:
 
     @property
     def segments(self) -> List[Segment]:
-        return deepcopy(self._segments)
-
-    @property
-    def count_pivots(self) -> int:
         """
-        Count of the pivots list.
+        The segment list.
 
         :return:
         """
-        return len(self._pivots)
+        return deepcopy(self._segments)
+
+    @property
+    def count_isolation_lines(self) -> int:
+        """
+        Count of the isolation lines list.
+
+        :return:
+        """
+        return len(self._isolation_lines)
+
+    @property
+    def isolation_lines(self) -> List[IsolationLine]:
+        """
+        The isolation lines list.
+
+        :return:
+        """
+        return deepcopy(self._isolation_lines)
+
+    @property
+    def count_stroke_pivots(self) -> int:
+        """
+        Count of the stroke pivots list.
+
+        :return:
+        """
+        return len(self._stroke_pivots)
+
+    @property
+    def stroke_pivots(self) -> List[Pivot]:
+        """
+        Count of the segment pivots list.
+
+        :return:
+        """
+        return deepcopy(self._stroke_pivots)
+
+    @property
+    def count_segment_pivots(self) -> int:
+        """
+        Count of the segment pivots list.
+
+        :return:
+        """
+        return len(self._segment_pivots)
+
+    @property
+    def segment_pivots(self) -> List[Pivot]:
+        """
+        The segment pivots list.
+
+        :return:
+        """
+        return deepcopy(self._segment_pivots)
 
     @staticmethod
     def is_inclusive(left_candle: OrdinaryCandle,
@@ -786,7 +866,6 @@ class ChanTheory:
         if self.count_segments == 0:
 
             # 申明变量类型并赋值。
-            new_segment: Optional[Segment] = None
             stroke_p1: Stroke = self._strokes[-1]
             stroke_p3: Stroke
             overlap_high: float = 0.0   # 重叠区间高值
@@ -856,18 +935,21 @@ class ChanTheory:
                         f'overlap high = {overlap_high}，overlap low = {overlap_low}'
                     )
 
-                # new_segment = self._generate_segment(stroke_p3, stroke_p1)
-
                 if overlap_high > overlap_low:
 
-                    new_segment = Segment(
+                    new_segment: Segment = Segment(
                         id=self.count_segments,
                         trend=Trend.Bullish if stroke_p1.trend == Trend.Bullish else Trend.Bearish,
                         left_stroke=stroke_p3,
                         right_stroke=stroke_p1
                     )
-                if new_segment:
                     self._segments.append(new_segment)
+
+                    new_isolation_line: IsolationLine = IsolationLine(
+                        id=self.count_isolation_lines,
+                        candle=stroke_p3.left_fractal.middle_candle
+                    )
+                    self._isolation_lines.append(new_isolation_line)
 
                     if self._log:
                         print(
@@ -1003,12 +1085,18 @@ class ChanTheory:
                 ):
                     new_segment = Segment(
                         id=self.count_segments,
-                        trend=Trend.Bullish if stroke_n3.trend == Trend.Bullish
-                        else Trend.Bearish,
+                        trend=Trend.Bullish
+                        if stroke_n3.trend == Trend.Bullish else Trend.Bearish,
                         left_stroke=stroke_n1,
                         right_stroke=stroke_n3
                     )
                     self._segments.append(new_segment)
+
+                    new_isolation_line: IsolationLine = IsolationLine(
+                        id=self.count_isolation_lines,
+                        candle=stroke_n1.left_fractal.middle_candle
+                    )
+                    self._isolation_lines.append(new_isolation_line)
 
                     if self._log:
                         print(
@@ -1019,7 +1107,7 @@ class ChanTheory:
                                 right=new_segment.right_ordinary_idx
                             )
                         )
-                    last_segment.right_stroke = self._strokes[stroke_n1.id - 1]
+                    # last_segment.right_stroke = self._strokes[stroke_n1.id - 1]
 
                     return True
 
@@ -1085,6 +1173,7 @@ class ChanTheory:
                                     )
                                 )
                             last_segment.right_stroke = stroke_p1
+
                             return True
 
                         # 其他情况（ stroke_p3 的 id 与 last_segment 的右侧笔的 id 相差 4 以上）：
@@ -1098,6 +1187,13 @@ class ChanTheory:
                                 right_stroke=self._strokes[stroke_p3.id - 1]
                             )
                             self._segments.append(new_segment)
+
+                            new_isolation_line: IsolationLine = IsolationLine(
+                                id=self.count_isolation_lines,
+                                candle=new_segment.left_stroke.left_fractal.middle_candle
+                            )
+                            self._isolation_lines.append(new_isolation_line)
+
                             if self._log:
                                 print(
                                     msg_generate.format(
@@ -1119,6 +1215,12 @@ class ChanTheory:
                         )
                         self._segments.append(new_segment)
 
+                        new_isolation_line: IsolationLine = IsolationLine(
+                            id=self.count_isolation_lines,
+                            candle=new_segment.left_stroke.left_fractal.middle_candle
+                        )
+                        self._isolation_lines.append(new_isolation_line)
+
                         if self._log:
                             print(
                                 msg_generate.format(
@@ -1133,7 +1235,7 @@ class ChanTheory:
 
         return False
 
-    def generate_pivot(self) -> bool:
+    def generate_stroke_pivot(self) -> bool:
         """
         Generate the pivots.
         :return:
@@ -1160,7 +1262,7 @@ class ChanTheory:
         if is_changed:
             is_changed = self.generate_segment()
         if is_changed:
-            is_changed = self.generate_pivot()
+            is_changed = self.generate_stroke_pivot()
 
     def run_with_dataframe(self, df: pd.DataFrame, count: int = 0) -> None:
         """
@@ -1241,18 +1343,31 @@ class ChanTheory:
                     else:
                         print(f'      向前（左）第{i}个线段：不存在。')
 
-                # 中枢
-                print(f'\n    中枢数量： {self.count_pivots}。')
+                # 笔中枢
+                print(f'\n    笔中枢数量： {self.count_stroke_pivots}。')
                 for i in range(1, 3):
-                    if self.count_pivots >= i:
-                        pivot = self._pivots[-i]
+                    if self.count_stroke_pivots >= i:
+                        pivot = self._stroke_pivots[-i]
                         print(
-                            f'      向前（左）第{i}个中枢：id = {pivot.id}，'
+                            f'      向前（左）第{i}个笔中枢：id = {pivot.id}，'
                             f'idx（普通K线）= {pivot.left_ordinary_idx} ~ {pivot.right_ordinary_idx}，'
                             f'price = {pivot.left_price} ~ {pivot.right_price}。'
                         )
                     else:
-                        print(f'      向前（左）第{i}个中枢：不存在。')
+                        print(f'      向前（左）第{i}个笔中枢：不存在。')
+
+                # 段中枢
+                print(f'\n    段中枢数量： {self.count_segment_pivots}。')
+                for i in range(1, 3):
+                    if self.count_segment_pivots >= i:
+                        pivot = self._segment_pivots[-i]
+                        print(
+                            f'      向前（左）第{i}个段中枢：id = {pivot.id}，'
+                            f'idx（普通K线）= {pivot.left_ordinary_idx} ~ {pivot.right_ordinary_idx}，'
+                            f'price = {pivot.left_price} ~ {pivot.right_price}。'
+                        )
+                    else:
+                        print(f'      向前（左）第{i}个段中枢：不存在。')
 
     def plot(self,
              df: pd.DataFrame,
@@ -1398,6 +1513,13 @@ class ChanTheory:
             )
         )
 
+        # 同级别分解线
+        plot_isolation: List[str] = []
+        for isolation in self._isolation_lines:
+            plot_isolation.append(
+                df.index[isolation.candle.right_ordinary_idx]
+            )
+
         # mplfinance 的配置
         mpf_config = {}
 
@@ -1406,11 +1528,16 @@ class ChanTheory:
             type='candle',
             volume=False,
             addplot=additional_plot,
+            vlines={
+                'vlines': plot_isolation,
+                'colors': 'g',
+                'linewidths': 2
+            },
             alines={
                 'alines': [plot_stroke, plot_segment],
                 'colors': ['k', 'r'],
                 'linestyle': '--',
-                'linewidths':0.05
+                'linewidths': 0.01
             },
             show_nontrading=False,
             figratio=(40, 20),
@@ -1420,6 +1547,10 @@ class ChanTheory:
             return_width_config=mpf_config,
             warn_too_much_data=1000
         )
+
+        if self._debug:
+            for k, v in mpf_config.items():
+                print(k, ': ', v)
 
         candle_width = mpf_config['candle_width']
         line_width = mpf_config['line_width']
