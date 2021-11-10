@@ -207,6 +207,26 @@ class Pivot:
     def right_ordinary_idx(self) -> int:
         return self.right.ordinary_idx
 
+    @property
+    def left_price(self) -> float:
+        return self.left.extreme_price
+
+    @property
+    def right_price(self) -> float:
+        return self.right.extreme_price
+
+    @property
+    def period(self) -> int:
+        return self.right_ordinary_idx - self.left_ordinary_idx
+
+    @property
+    def price_range(self) -> float:
+        return self.right_price - self.left_price
+
+    @property
+    def slope(self) -> float:
+        return self.price_range / self.period
+
     def __str__(self) -> str:
         return f'Pivot (id={self.id}, ' \
                f'left_ordinary_idx={self.left_ordinary_idx}, ' \
@@ -340,10 +360,10 @@ class ChanTheory:
         # debug message.
         msg_generated: str = '\n  ● 生成K线：\n    第 {id} 根合并K线，' \
                              '起始idx（普通K线）= {ordinary_idx}，周期 = {period}，' \
-                             '高点 = {high}，低点 = {low}。\n'
+                             '高点 = {high}，低点 = {low}。'
         msg_merged: str = '\n  ● 合并K线：\n    第 {id} 根合并K线，' \
                           '起始 idx（普通K线）= {ordinary_idx}，周期 = {period}，' \
-                          '高点 = {high}，低点 = {low}。\n'
+                          '高点 = {high}，低点 = {low}。'
 
         # 申明变量类型并赋值。
         is_changed: bool = False
@@ -572,9 +592,9 @@ class ChanTheory:
 
         # debug message
         msg_generate: str = '\n  ● 生成笔：\n    第 {id} 根笔，趋势 = {trend}，' \
-                            '起点 idx（普通K线 ）= {left}，终点 idx（普通K线）= {right}。\n'
+                            '起点 idx（普通K线 ）= {left}，终点 idx（普通K线）= {right}。'
         msg_extend: str = '\n  ● 延伸笔：\n    第 {id} 根笔，趋势 = {trend}，' \
-                          '原终点 idx（普通K线）= {old}，现终点 idx（普通K线）= {new}。\n'
+                          '原终点 idx（普通K线）= {old}，现终点 idx（普通K线）= {new}。'
 
         # 如果 笔的数量 == 0：
         #     向前穷举 fractal_p2，如果：
@@ -774,9 +794,9 @@ class ChanTheory:
 
             if self._debug:
                 print(
-                    f'\n  ○ 尝试生成线段：'
-                    f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。'
-                    f'\n    向前（左）第1根笔，id = {stroke_p1.id}，'
+                    f'\n  ○ 尝试生成首根线段：'
+                    f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。\n'
+                    f'    向前（左）第1根笔，id = {stroke_p1.id}，'
                     f'high = {max(stroke_p1.left_price, stroke_p1.right_price)}，'
                     f'low = {min(stroke_p1.left_price, stroke_p1.right_price)}'
                 )
@@ -852,7 +872,7 @@ class ChanTheory:
                     if self._log:
                         print(
                             msg_generate.format(
-                                id=new_segment.id,
+                                id=new_segment.id + 1,
                                 trend=new_segment.trend,
                                 left=new_segment.left_ordinary_idx,
                                 right=new_segment.right_ordinary_idx
@@ -864,150 +884,253 @@ class ChanTheory:
         # 如果 线段数量 >= 1：
         else:
             last_segment: Segment = self._segments[-1]
+            last_stroke: Stroke = self._strokes[-1]
 
-            # 在 笔数量 - 最后线段的右侧笔 id >= 1 时：
-            if self.count_strokes - last_segment.right_stroke.id >= 1:
+            if last_stroke.id - last_segment.right_stroke.id < 2:
+                pass
+
+            # 在 最新笔的 id - 最新线段的右侧笔的 id == 2 时：
+            elif last_stroke.id - last_segment.right_stroke.id == 2:
 
                 if self._debug:
                     print(
-                        f'\n  ○ 尝试修正线段：'
-                        f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。'
-                        f'\n    最新线段的右侧笔 id = {last_segment.right_stroke.id}，'
+                        f'\n  ○ 尝试顺向延伸线段：'
+                        f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。\n'
+                        f'    最新线段的最新笔 id = {last_segment.right_stroke.id}，'
                         f'trend = {last_segment.right_stroke.trend}，'
-                        f'high = {max(last_segment.left_price, last_segment.right_price)}，'
-                        f'low = {min(last_segment.left_price, last_segment.right_price)}'
+                        f'price left = {last_segment.left_price}，'
+                        f'price right = {last_segment.right_price}\n'
+                        f'    最新          笔 id = {last_stroke.id}，'
+                        f'trend = {last_stroke.trend}，'
+                        f'price left = {last_stroke.left_price}，'
+                        f'price right = {last_stroke.right_price}'
                     )
 
-                for i in range(last_segment.right_stroke.id + 1, self.count_strokes):
+                # 如果：
+                #     A1. 上升线段，且
+                #     A2. 线段后第2笔 是 上升笔，且
+                #     A3. 线段后第2笔的右侧价 >= 线段右侧价
+                #   或
+                #     B1. 下降线段，且
+                #     B2. 线段后第2笔 是 下降笔，且
+                #     B3. 线段后第2笔的右侧价 <= 线段右侧价
+                # 延伸线段。
+                if (
+                        last_segment.trend == Trend.Bullish and
+                        last_stroke.trend == Trend.Bullish and
+                        last_stroke.right_price >= last_segment.right_price
+                ) or (
+                        last_segment.trend == Trend.Bearish and
+                        last_stroke.trend == Trend.Bearish and
+                        last_stroke.right_price <= last_segment.right_price
+                ):
 
-                    stroke_n2: Stroke
-                    if i + 1 < self.count_strokes:
-                        stroke_n2 = self._strokes[i + 1]
-                    else:
-                        break
-
-                    if self._debug:
+                    if self._log:
                         print(
-                            f'    尝试顺向延伸线段：\n'
-                            f'        笔 id = {stroke_n2.id}，trend = {stroke_n2.trend}，'
-                            f'high = {max(stroke_n2.left_price, stroke_n2.right_price)}，'
-                            f'low = {min(stroke_n2.left_price, stroke_n2.right_price)}'
-                        )
-
-                    # 如果：
-                    #     A1. 上升线段，且
-                    #     A2. 线段后第2笔 是 上升笔，且
-                    #     A3. 线段后第2笔的右侧价 >= 线段右侧价
-                    #   或
-                    #     B1. 下降线段，且
-                    #     B2. 线段后第2笔 是 下降笔，且
-                    #     B3. 线段后第2笔的右侧价 <= 线段右侧价
-                    # 延伸线段。
-                    if stroke_n2 is not None and \
-                            (
-                                    last_segment.trend == Trend.Bullish and
-                                    stroke_n2.trend == Trend.Bullish and
-                                    stroke_n2.right_price >= last_segment.right_price
-                            ) or \
-                            (
-                                    last_segment.trend == Trend.Bearish and
-                                    stroke_n2.trend == Trend.Bearish and
-                                    stroke_n2.right_price <= last_segment.right_price
-                            ):
-
-                        if self._log:
-                            print(
-                                msg_extend.format(
-                                    id=last_segment.id,
-                                    trend=last_segment.trend,
-                                    old=last_segment.right_ordinary_idx,
-                                    new=stroke_n2.right_ordinary_idx
-                                )
+                            msg_extend.format(
+                                id=last_segment.id + 1,
+                                trend=last_segment.trend,
+                                old=last_segment.right_ordinary_idx,
+                                new=last_stroke.right_ordinary_idx
                             )
-                        last_segment.right_stroke = stroke_n2
-
-                        return True
-
-                    stroke_n1: Stroke = self._strokes[i]
-                    stroke_n3: Stroke
-                    if i + 2 < self.count_strokes:
-                        stroke_n3 = self._strokes[i + 2]
-                    else:
-                        break
-
-                    if self._debug:
-                        print(
-                            f'    尝试反向生成线段：\n'
-                            f'        笔 id = {stroke_n1.id}，trend = {stroke_n1.trend}，'
-                            f'high = {max(stroke_n1.left_price, stroke_n1.right_price)}，'
-                            f'low = {min(stroke_n1.left_price, stroke_n1.right_price)}\n'
-                            f'        笔 id = {stroke_n3.id}，trend = {stroke_n3.trend}，'
-                            f'high = {max(stroke_n3.left_price, stroke_n3.right_price)}，'
-                            f'low = {min(stroke_n3.left_price, stroke_n3.right_price)}\n'
                         )
+                    last_segment.right_stroke = last_stroke
 
-                    # 如果：
-                    #     A1. 上升线段，且
-                    #         A2A. 线段后第1笔的右侧价 <= 线段右侧笔的左侧价，且
-                    #         A2B. 线段后第3笔的右侧价 <  线段右侧笔的左侧价
-                    #       或
-                    #         A3. 线段后第3笔的右侧价 <=  线段后第1笔的右侧价
-                    #   或
-                    #     B1. 下降线段，且
-                    #         B2A. 线段后第1笔的右侧价 >= 线段右侧笔的左侧价，且
-                    #         B2B. 线段后第3笔的右侧价 >  线段右侧笔的左侧价
-                    #       或
-                    #         B3. 线段后第2笔的右侧价 >= 线段后第1笔的右侧价
-                    # 生成反向线段。
-                    if stroke_n3 is not None and \
-                            (
-                                    last_segment.trend == Trend.Bullish and
-                                    stroke_n3.trend == Trend.Bearish and
-                                    (
-                                            stroke_n3.right_price <= stroke_n1.right_price or
-                                            (
-                                                    stroke_n1.right_price
-                                                    <= last_segment.right_stroke.left_price
-                                                    and
-                                                    stroke_n3.right_price
-                                                    < last_segment.right_stroke.left_price
-                                            )
+                    return True
+
+            # 在 最新笔的 id - 最新线段的右侧笔的 id == 3 时：
+            elif last_stroke.id - last_segment.right_stroke.id == 3:
+                stroke_n1: Stroke = self._strokes[-3]
+                stroke_n3: Stroke = self._strokes[-1]
+
+                if self._debug:
+                    print(
+                        f'\n  ○ 尝试生成反向线段：'
+                        f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。\n'
+                        f'    最新线段的最新笔 id = {last_segment.right_stroke.id}，'
+                        f'trend = {last_segment.right_stroke.trend}，'
+                        f'price left = {last_segment.left_price}，'
+                        f'price right = {last_segment.right_price}\n'
+                        f'    最新线段的右侧第1笔 id = {stroke_n1.id}，'
+                        f'trend = {stroke_n1.trend}，'
+                        f'price left = {stroke_n1.left_price}，'
+                        f'price right = {stroke_n1.right_price}\n'
+                        f'    最新线段的右侧第3笔 id = {stroke_n3.id}，'
+                        f'trend = {stroke_n3.trend}，'
+                        f'price left = {stroke_n3.left_price}，'
+                        f'price right = {stroke_n3.right_price}'
+                    )
+
+                # 如果：
+                #     A1. 上升线段，且
+                #         A2A. 线段后第1笔的右侧价 <= 线段右侧笔的左侧价，且
+                #         A2B. 线段后第3笔的右侧价 <  线段右侧笔的左侧价
+                #       或
+                #         A3. 线段后第3笔的右侧价 <=  线段后第1笔的右侧价
+                #   或
+                #     B1. 下降线段，且
+                #         B2A. 线段后第1笔的右侧价 >= 线段右侧笔的左侧价，且
+                #         B2B. 线段后第3笔的右侧价 >  线段右侧笔的左侧价
+                #       或
+                #         B3. 线段后第2笔的右侧价 >= 线段后第1笔的右侧价
+                # 生成反向线段。
+                if (
+                        last_segment.trend == Trend.Bullish and
+                        stroke_n3.trend == Trend.Bearish and
+                        (
+                                stroke_n3.right_price <= stroke_n1.right_price or
+                                (
+                                        stroke_n1.right_price
+                                        <= last_segment.right_stroke.left_price
+                                        and
+                                        stroke_n3.right_price
+                                        < last_segment.right_stroke.left_price
+                                )
+                        )
+                ) or (
+                        last_segment.trend == Trend.Bearish and
+                        stroke_n3.trend == Trend.Bullish and
+                        (
+                                stroke_n3.right_price >= stroke_n1.right_price or
+                                (
+                                        stroke_n1.right_price
+                                        >= last_segment.right_stroke.left_price
+                                        and
+                                        stroke_n3.right_price
+                                        > last_segment.right_stroke.left_price
+                                )
+                        )
+                ):
+                    new_segment = Segment(
+                        id=self.count_segments,
+                        trend=Trend.Bullish if stroke_n3.trend == Trend.Bullish
+                        else Trend.Bearish,
+                        left_stroke=stroke_n1,
+                        right_stroke=stroke_n3
+                    )
+                    self._segments.append(new_segment)
+
+                    if self._log:
+                        print(
+                            msg_generate.format(
+                                id=new_segment.id + 1,
+                                trend=new_segment.trend,
+                                left=new_segment.left_ordinary_idx,
+                                right=new_segment.right_ordinary_idx
+                            )
+                        )
+                    last_segment.right_stroke = self._strokes[stroke_n1.id - 1]
+
+                    return True
+
+            # 在 最新笔的 id - 最新线段的右侧笔的 id > 3 时：
+            #     既不能顺向突破（id差 == 2）
+            #     又不能反向突破（id差 == 3）
+            # 跳空。
+            else:
+
+                stroke_p1: Stroke = self._strokes[-1]
+                stroke_p3: Stroke = self._strokes[-3]
+
+                if self._debug:
+                    print(
+                        f'\n  ○ 尝试生成跳空线段：'
+                        f'目前共有线段 {self.count_segments} 根，笔 {self.count_strokes} 根。\n'
+                        f'    最新线段的最新笔 id = {last_segment.right_stroke.id}，'
+                        f'trend = {last_segment.right_stroke.trend}，'
+                        f'price left = {last_segment.left_price}，'
+                        f'price right = {last_segment.right_price}\n'
+                        f'    向前（左）第1笔 id = {stroke_p1.id}，'
+                        f'trend = {stroke_p1.trend}，'
+                        f'price left = {stroke_p1.left_price}，'
+                        f'price right = {stroke_p1.right_price}\n'
+                        f'    向前（左）第3笔 id = {stroke_p3.id}，'
+                        f'trend = {stroke_p3.trend}，'
+                        f'price left = {stroke_p3.left_price}，'
+                        f'price right = {stroke_p3.right_price}'
+                    )
+
+                # 如果：
+                #     A1. stroke_p1 是 上升笔，且
+                #     A2. stroke_p3 的 左侧价 <= stroke_p1 的 左侧价 < stroke_p3 的 右侧价，且
+                #     A3. stroke_p1 的 右侧价 > stroke_p3 的 右侧价
+                #   或
+                #     B1. stroke_p1 是 下降笔，且
+                #     B2. stroke_p3 的 左侧价 <= stroke_p1 的 左侧价 < stroke_p3 的 右侧价，且
+                #     B3. stroke_p1 的 右侧价 < stroke_p3 的 右侧价
+                # 生成跳空线段。
+                if (
+                        stroke_p1.trend == Trend.Bullish and
+                        stroke_p3.left_price <= stroke_p1.left_price < stroke_p3.right_price
+                        < stroke_p1.right_price
+                ) or (
+                        stroke_p1.trend == Trend.Bearish and
+                        stroke_p1.right_price < stroke_p3.right_price <= stroke_p1.left_price
+                        < stroke_p3.left_price
+                ):
+                    new_segment: Segment
+
+                    # 如果 stroke_p1 与 last_segment 同向：
+                    if stroke_p1.trend == last_segment.trend:
+                        # 如果 stroke_p3 的 id 与 last_segment 的右侧笔的 id 相差 2：
+                        # 延伸 last_segment
+                        if stroke_p3.id - last_segment.right_stroke.id == 2:
+                            if self._log:
+                                print(
+                                    msg_extend.format(
+                                        id=last_segment.id + 1,
+                                        trend=last_segment.trend,
+                                        old=last_segment.right_ordinary_idx,
+                                        new=stroke_p1.right_ordinary_idx
                                     )
-                            ) or (
-                                    last_segment.trend == Trend.Bearish and
-                                    stroke_n3.trend == Trend.Bullish and
-                                    (
-                                            stroke_n3.right_price >= stroke_n1.right_price or
-                                            (
-                                                    stroke_n1.right_price
-                                                    >= last_segment.right_stroke.left_price
-                                                    and
-                                                    stroke_n3.right_price
-                                                    > last_segment.right_stroke.left_price
-                                            )
+                                )
+                            last_segment.right_stroke = stroke_p1
+                            return True
+
+                        # 其他情况（ stroke_p3 的 id 与 last_segment 的右侧笔的 id 相差 4 以上）：
+                        # 补一根反向线段，起点是 last_segment 的右端点，终点是 stroke_p3 的左端点。
+                        else:
+                            new_segment = Segment(
+                                id=self.count_segments,
+                                trend=Trend.Bearish
+                                if stroke_p1.trend == Trend.Bullish else Trend.Bullish,
+                                left_stroke=self._strokes[last_segment.right_stroke.id + 1],
+                                right_stroke=self._strokes[stroke_p3.id - 1]
+                            )
+                            self._segments.append(new_segment)
+                            if self._log:
+                                print(
+                                    msg_generate.format(
+                                        id=new_segment.id + 1,
+                                        trend=new_segment.trend,
+                                        left=new_segment.left_ordinary_idx,
+                                        right=new_segment.right_ordinary_idx
                                     )
-                            ):
+                                )
+                            return True
+                    # 如果 stroke_p1 与 last_segment 反向：
+                    else:
                         new_segment = Segment(
                             id=self.count_segments,
-                            trend=Trend.Bullish if stroke_n3.trend == Trend.Bullish
-                            else Trend.Bearish,
-                            left_stroke=stroke_n1,
-                            right_stroke=stroke_n3
+                            trend=Trend.Bullish
+                            if stroke_p1.trend == Trend.Bullish else Trend.Bearish,
+                            left_stroke=self._strokes[last_segment.right_stroke.id + 1],
+                            right_stroke=stroke_p1
                         )
                         self._segments.append(new_segment)
 
                         if self._log:
                             print(
                                 msg_generate.format(
-                                    id=new_segment.id,
+                                    id=new_segment.id + 1,
                                     trend=new_segment.trend,
                                     left=new_segment.left_ordinary_idx,
                                     right=new_segment.right_ordinary_idx
                                 )
                             )
-                        last_segment.right_stroke = self._strokes[stroke_n1.id - 1]
 
                         return True
+
         return False
 
     def generate_pivot(self) -> bool:
