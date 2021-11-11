@@ -156,6 +156,7 @@ class Segment:
     trend: Trend
     left_stroke: Stroke
     right_stroke: Stroke
+    strokes: List[int]
 
     @property
     def left_price(self) -> float:
@@ -174,6 +175,10 @@ class Segment:
         return self.right_stroke.right_ordinary_idx
 
     @property
+    def strokes_count(self) -> int:
+        return len(self.strokes)
+
+    @property
     def period(self) -> int:
         return self.right_ordinary_idx - self.left_ordinary_idx
 
@@ -188,7 +193,8 @@ class Segment:
     def __str__(self) -> str:
         return f'Segment (id={self.id}, trend={self.trend.value}, ' \
                f'left_ordinary_idx={self.left_ordinary_idx}, ' \
-               f'right_ordinary_idx={self.right_ordinary_idx})'
+               f'right_ordinary_idx={self.right_ordinary_idx}, ' \
+               f'count of strokes = {self.strokes_count}, strokes = {self.strokes})'
 
 
 @dataclass
@@ -867,6 +873,7 @@ class ChanTheory:
 
             # 申明变量类型并赋值。
             stroke_p1: Stroke = self._strokes[-1]
+            stroke_p2: Stroke
             stroke_p3: Stroke
             overlap_high: float = 0.0   # 重叠区间高值
             overlap_low: float = 0.0    # 重叠区间低值
@@ -881,6 +888,7 @@ class ChanTheory:
                 )
             for i in range(0, stroke_p1.id - 1):
                 stroke_p3 = self._strokes[i]
+                stroke_p2 = self._strokes[i + 1]
 
                 # 如果 前1笔 的趋势与 前3笔 不一致，重新循环。
                 # （理论上不可能，但是留做保险。）
@@ -941,7 +949,8 @@ class ChanTheory:
                         id=self.count_segments,
                         trend=Trend.Bullish if stroke_p1.trend == Trend.Bullish else Trend.Bearish,
                         left_stroke=stroke_p3,
-                        right_stroke=stroke_p1
+                        right_stroke=stroke_p1,
+                        strokes=[stroke_p3.id, stroke_p2.id, stroke_p1.id]
                     )
                     self._segments.append(new_segment)
 
@@ -1016,6 +1025,8 @@ class ChanTheory:
                                 new=last_stroke.right_ordinary_idx
                             )
                         )
+                    for i in range(last_segment.right_stroke.id + 1, last_stroke.id + 1):
+                        last_segment.strokes.append(i)
                     last_segment.right_stroke = last_stroke
 
                     return True
@@ -1023,6 +1034,7 @@ class ChanTheory:
             # 在 最新笔的 id - 最新线段的右侧笔的 id == 3 时：
             elif last_stroke.id - last_segment.right_stroke.id == 3:
                 stroke_n1: Stroke = self._strokes[-3]
+                stroke_n2: Stroke = self._strokes[-2]
                 stroke_n3: Stroke = self._strokes[-1]
 
                 if self._debug:
@@ -1088,7 +1100,8 @@ class ChanTheory:
                         trend=Trend.Bullish
                         if stroke_n3.trend == Trend.Bullish else Trend.Bearish,
                         left_stroke=stroke_n1,
-                        right_stroke=stroke_n3
+                        right_stroke=stroke_n3,
+                        strokes=[stroke_n1.id, stroke_n2.id, stroke_n3.id]
                     )
                     self._segments.append(new_segment)
 
@@ -1172,6 +1185,8 @@ class ChanTheory:
                                         new=stroke_p1.right_ordinary_idx
                                     )
                                 )
+                            for i in range(last_segment.right_stroke.id + 1, stroke_p1.id + 1):
+                                last_segment.strokes.append(i)
                             last_segment.right_stroke = stroke_p1
 
                             return True
@@ -1184,7 +1199,10 @@ class ChanTheory:
                                 trend=Trend.Bearish
                                 if stroke_p1.trend == Trend.Bullish else Trend.Bullish,
                                 left_stroke=self._strokes[last_segment.right_stroke.id + 1],
-                                right_stroke=self._strokes[stroke_p3.id - 1]
+                                right_stroke=self._strokes[stroke_p3.id - 1],
+                                strokes=[
+                                    i for i in range(last_segment.right_stroke.id + 1, stroke_p3.id)
+                                ]
                             )
                             self._segments.append(new_segment)
 
@@ -1211,7 +1229,10 @@ class ChanTheory:
                             trend=Trend.Bullish
                             if stroke_p1.trend == Trend.Bullish else Trend.Bearish,
                             left_stroke=self._strokes[last_segment.right_stroke.id + 1],
-                            right_stroke=stroke_p1
+                            right_stroke=stroke_p1,
+                            strokes=[
+                                i for i in range(last_segment.right_stroke.id + 1, stroke_p1.id + 1)
+                            ]
                         )
                         self._segments.append(new_segment)
 
