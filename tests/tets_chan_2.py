@@ -5,9 +5,8 @@ __author__ = 'Bruce Frank Wong'
 
 import pytest
 
-from InvestmentWorkshop.indicator.chan2 import (
+from InvestmentWorkshop.indicator.chan.dynamic import (
     OrdinaryCandle,
-    is_inclusive_number,
     is_inclusive_candle
 )
 

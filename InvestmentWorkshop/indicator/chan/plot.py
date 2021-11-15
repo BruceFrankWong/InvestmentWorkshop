@@ -13,7 +13,7 @@ import mplfinance as mpf
 
 from .definition import (
     MergedCandleList,
-    FractalType,
+    FractalPattern,
     FractalList,
     SegmentList,
 )
@@ -94,20 +94,20 @@ def plot_chan_theory(df_origin: pd.DataFrame,
 
         stroke.append(
             (
-                df_origin.index[fractal.middle_candle.last_ordinary_idx],
+                df_origin.index[fractal.ordinary_id],
                 fractal.extreme_price
             )
         )
-        for j in range(idx_ordinary_candle, fractal.middle_candle.last_ordinary_idx):
+        for j in range(idx_ordinary_candle, fractal.ordinary_id):
             fractal_t.append(np.nan)
             fractal_b.append(np.nan)
-        if fractal.type_ == FractalType.Top:
+        if fractal.pattern == FractalPattern.Top:
             fractal_t.append(fractal.middle_candle.high + fractal_marker_offset)
             fractal_b.append(np.nan)
-        if fractal.type_ == FractalType.Bottom:
+        if fractal.pattern == FractalPattern.Bottom:
             fractal_t.append(np.nan)
             fractal_b.append(fractal.middle_candle.low - fractal_marker_offset)
-        idx_ordinary_candle = fractal.middle_candle.last_ordinary_idx + 1
+        idx_ordinary_candle = fractal.ordinary_id + 1
     for i in range(idx_ordinary_candle, count):
         fractal_t.append(np.nan)
         fractal_b.append(np.nan)
@@ -128,13 +128,13 @@ def plot_chan_theory(df_origin: pd.DataFrame,
 
         plot_segment.append(
             (
-                df_origin.index[fractal.middle_candle.last_ordinary_idx],
+                df_origin.index[fractal.ordinary_id],
                 fractal.extreme_price
             )
         )
     plot_segment.append(
         (
-            df_origin.index[segment_list[-1].right_fractal.middle_candle.last_ordinary_idx],
+            df_origin.index[segment_list[-1].right_fractal.ordinary_id],
             segment_list[-1].right_fractal.extreme_price
         )
     )
@@ -176,7 +176,7 @@ def plot_chan_theory(df_origin: pd.DataFrame,
     for idx in range(len(merged_candle_list)):
         candle = merged_candle_list[idx]
 
-        if candle.first_ordinary_idx > count:
+        if candle.left_ordinary_id > count:
             break
 
         if not show_all_merged and candle.period == 1:
@@ -184,7 +184,7 @@ def plot_chan_theory(df_origin: pd.DataFrame,
         candle_chan.append(
             Rectangle(
                 xy=(
-                    candle.first_ordinary_idx - candle_width / 2,
+                    candle.left_ordinary_id - candle_width / 2,
                     candle.low
                 ),
                 width=candle.period - 1 + candle_width,
@@ -243,7 +243,7 @@ def plot_chan_theory(df_origin: pd.DataFrame,
 
         for i in range(len(merged_candle_list)):
             candle = merged_candle_list[i]
-            idx_chan_x.append(candle.last_ordinary_idx - candle_width / 2)
+            idx_chan_x.append(candle.right_ordinary_id - candle_width / 2)
             idx_chan_y.append(candle.high + 14)
             idx_chan_value.append(str(merged_candle_list.index(candle)))
 
