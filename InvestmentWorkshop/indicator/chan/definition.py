@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List
+from typing import List, Tuple, Optional
 from enum import Enum
 from dataclasses import dataclass
 
@@ -51,6 +51,11 @@ class FractalFunction(Enum):
 
     def __str__(self) -> str:
         return self.value
+
+
+class Direction(Enum):
+    Left = '左'
+    Right = '右'
 
 
 class Trend(Enum):
@@ -104,9 +109,9 @@ class MergedCandle(OrdinaryCandle):
 class Fractal:
     id: int
     pattern: FractalPattern
-    left_candle: MergedCandle
+    left_candle: Optional[MergedCandle]
     middle_candle: MergedCandle
-    right_candle: MergedCandle
+    right_candle: Optional[MergedCandle]
     is_confirmed: bool
 
     @property
@@ -123,6 +128,15 @@ class Fractal:
     @property
     def ordinary_id(self) -> int:
         return self.middle_candle.ordinary_id
+
+    @property
+    def is_potential(self) -> Tuple[bool, Optional[Direction]]:
+        if self.left_candle is None:
+            return True, Direction.Left
+        elif self.right_candle is None:
+            return True, Direction.Right
+        else:
+            return False, None
 
     def __str__(self) -> str:
         return f'Fractal (id = {self.id}, ' \

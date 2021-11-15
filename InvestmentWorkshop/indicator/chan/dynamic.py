@@ -19,6 +19,7 @@ from .definition import (
     Trend,
     OrdinaryCandle,
     MergedCandle,
+    Fractal,
     IsolationLine,
 )
 from .log_message import (
@@ -57,36 +58,6 @@ class PotentialFractal:
 
     def __str__(self) -> str:
         return f'PotentialFractal (pattern={self.pattern.value}, ' \
-               f'merged id={self.merged_id}, ' \
-               f'ordinary id = {self.ordinary_id}, ' \
-               f'extreme price = {self.extreme_price})'
-
-
-@dataclass
-class Fractal:
-    id: int
-    candle: MergedCandle
-    pattern: FractalPattern
-    is_potential: bool
-
-    @property
-    def merged_id(self) -> int:
-        return self.candle.id
-
-    @property
-    def ordinary_id(self) -> int:
-        return self.candle.ordinary_id
-
-    @property
-    def extreme_price(self) -> float:
-        if self.pattern == FractalPattern.Top:
-            return self.candle.high
-        else:
-            return self.candle.low
-
-    def __str__(self) -> str:
-        return f'Fractal (id={self.id}, ' \
-               f'pattern={self.pattern.value}, ' \
                f'merged id={self.merged_id}, ' \
                f'ordinary id = {self.ordinary_id}, ' \
                f'extreme price = {self.extreme_price})'
@@ -668,8 +639,10 @@ class ChanTheory:
             new_fractal = Fractal(
                 id=self.fractals_count,
                 pattern=FractalPattern.Top,
-                candle=middle_candle,
-                is_potential=False
+                left_candle=left_candle,
+                middle_candle=middle_candle,
+                right_candle=right_candle,
+                is_confirmed=False
             )
 
         # 如果：
@@ -679,8 +652,10 @@ class ChanTheory:
             new_fractal = Fractal(
                 id=self.fractals_count,
                 pattern=FractalPattern.Bottom,
-                candle=middle_candle,
-                is_potential=False
+                left_candle=left_candle,
+                middle_candle=middle_candle,
+                right_candle=right_candle,
+                is_confirmed=False
             )
 
         # 否则不是分型。
@@ -695,8 +670,8 @@ class ChanTheory:
                     LOG_FRACTAL_GENERATED.format(
                         id=new_fractal.id + 1,
                         pattern=new_fractal.pattern.value,
-                        merged_candle_id=new_fractal.candle.id,
-                        ordinary_id=new_fractal.candle.ordinary_id
+                        merged_candle_id=new_fractal.merged_id,
+                        ordinary_id=new_fractal.ordinary_id
                     )
                 )
 
@@ -713,10 +688,11 @@ class ChanTheory:
             'not_enough_merged_candle':
                 '\n  ○ 尝试生成笔：目前仅有 {count} 根合并K线，最少需要 {minimum} 根。',
             'right_merged_candle':
-                '\n  ○ 尝试生成笔：\n    最新合并K线，id（合并K线）= {id}，idx（普通K线）= {idx}，'
+                '\n  ○ 尝试生成笔：\n'
+                '    最新合并K线，merged id（合并K线）= {mc_id}，ordinary id（普通K线）= {oc_id}，'
                 '潜在分型 = {potential_fractal}。',
             'left_merged_candle':
-                '    左合并K线，id（合并K线）= {id}，idx（普通K线）= {idx}',
+                '    左合并K线，merged id（合并K线）= {mc_id}，ordinary id（普通K线）= {oc_id}',
             'fractal':
                 '        潜在分型 = {fractal}，{result}',
             'distance':
@@ -751,8 +727,8 @@ class ChanTheory:
         if self._verbose:
             print(
                 verbose_message['right_merged_candle'].format(
-                    id=right_merged_candle.id,
-                    idx=right_merged_candle.ordinary_id,
+                    mc_id=right_merged_candle.id,
+                    oc_id=right_merged_candle.ordinary_id,
                     potential_fractal=right_fractal_pattern.value
                 )
             )
@@ -767,8 +743,8 @@ class ChanTheory:
             if self._verbose:
                 print(
                     verbose_message['left_merged_candle'].format(
-                        id=left_merged_candle.id,
-                        idx=left_merged_candle.ordinary_id
+                        mc_id=left_merged_candle.id,
+                        oc_id=left_merged_candle.ordinary_id
                     )
                 )
 
@@ -947,6 +923,7 @@ class ChanTheory:
         #   且
         #     3. last_merged_candle 和 last_stroke 的右分型的距离满足要求，且
         # 生成（反向）笔。
+        # TODO: 需要检查潜在分型。
         if (
                 (
                         last_stroke.trend == Trend.Bullish and
@@ -954,22 +931,14 @@ class ChanTheory:
                         max(
                             self._merged_candles[last_merged_candle.id - 1].high,
                             last_merged_candle.high
-                        ) < last_stroke.right_price and
-                        last_merged_candle.low == min([
-                            candle.low for candle in
-                            self._merged_candles[last_stroke.right_candle.id + 1:last_merged_candle.id + 1]
-                        ])
+                        ) < last_stroke.right_price
                 ) or (
                         last_stroke.trend == Trend.Bearish and
                         potential_fractal == FractalPattern.Top and
                         min(
                             self._merged_candles[last_merged_candle.id - 1].low,
                             last_merged_candle.low
-                        ) > last_stroke.right_price and
-                        last_merged_candle.high == max([
-                            candle.high for candle in
-                            self._merged_candles[last_stroke.right_candle.id + 1:last_merged_candle.id + 1]
-                        ])
+                        ) > last_stroke.right_price
                 )
         ) and distance >= self._minimum_distance:
 
@@ -1882,7 +1851,7 @@ class ChanTheory:
                         print(
                             f'      向向左第{i}个分型：id = {fractal.id}，'
                             f'pattern = {fractal.pattern.value}，'
-                            f'id（普通K线）= {fractal.candle.ordinary_id}。'
+                            f'id（普通K线）= {fractal.ordinary_id}。'
                         )
                     else:
                         print(f'      向向左第{i}个分型：不存在。')
@@ -2033,17 +2002,17 @@ class ChanTheory:
                 fractal = self._fractals[i]
 
                 # idx from previous fractal.ordinary_id to current fractal.ordinary_id
-                for j in range(previous_fractal_ordinary_id, fractal.candle.ordinary_id):
+                for j in range(previous_fractal_ordinary_id, fractal.ordinary_id):
                     fractal_t.append(np.nan)
                     fractal_b.append(np.nan)
 
                 if fractal.pattern == FractalPattern.Top:
-                    fractal_t.append(fractal.candle.high + fractal_marker_offset)
+                    fractal_t.append(fractal.middle_candle.high + fractal_marker_offset)
                     fractal_b.append(np.nan)
                 else:
                     fractal_t.append(np.nan)
-                    fractal_b.append(fractal.candle.low - fractal_marker_offset)
-                previous_fractal_ordinary_id = fractal.candle.ordinary_id + 1
+                    fractal_b.append(fractal.middle_candle.low - fractal_marker_offset)
+                previous_fractal_ordinary_id = fractal.ordinary_id + 1
 
             for i in range(previous_fractal_ordinary_id, count):
                 fractal_t.append(np.nan)
