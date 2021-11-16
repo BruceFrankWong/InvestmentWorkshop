@@ -5,6 +5,7 @@ __author__ = 'Bruce Frank Wong'
 
 from typing import List, Tuple, Optional
 from enum import Enum
+from copy import deepcopy
 from dataclasses import dataclass
 
 
@@ -37,6 +38,11 @@ class Action(Enum):
         return self.value
 
 
+class FirstOrLast(Enum):
+    First = 'First'
+    Last = 'Last'
+
+
 class FractalPattern(Enum):
     Top = '顶分型'
     Bottom = '底分型'
@@ -53,9 +59,13 @@ class FractalFunction(Enum):
         return self.value
 
 
-class Direction(Enum):
-    Left = '左'
-    Right = '右'
+class FractalPotential(Enum):
+    Regular = '正规'
+    Left = '左侧'
+    Right = '右侧'
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class Trend(Enum):
@@ -130,13 +140,13 @@ class Fractal:
         return self.middle_candle.ordinary_id
 
     @property
-    def is_potential(self) -> Tuple[bool, Optional[Direction]]:
+    def potential(self) -> FractalPotential:
         if self.left_candle is None:
-            return True, Direction.Left
+            return FractalPotential.Left
         elif self.right_candle is None:
-            return True, Direction.Right
+            return FractalPotential.Right
         else:
-            return False, None
+            return FractalPotential.Regular
 
     def __str__(self) -> str:
         return f'Fractal (id = {self.id}, ' \
@@ -144,6 +154,7 @@ class Fractal:
                f'merged id = {self.merged_id}, ' \
                f'ordinary id = {self.ordinary_id}, ' \
                f'extreme price = {self.extreme_price}, ' \
+               f'potential = {self.potential.value}, ' \
                f'confirmed = {self.is_confirmed})'
 
 
@@ -151,28 +162,42 @@ class Fractal:
 class Stroke:
     id: int
     trend: Trend
-    left_fractal: Fractal
-    right_fractal: Fractal
+    left_candle: MergedCandle
+    right_candle: MergedCandle
 
     @property
-    def left_price(self) -> float:
-        return self.left_fractal.extreme_price
-
-    @property
-    def right_price(self) -> float:
-        return self.right_fractal.extreme_price
+    def left_merged_id(self) -> int:
+        return self.left_candle.id
 
     @property
     def left_ordinary_id(self) -> int:
-        return self.left_fractal.ordinary_id
+        return self.left_candle.ordinary_id
+
+    @property
+    def right_merged_id(self) -> int:
+        return self.right_candle.id
 
     @property
     def right_ordinary_id(self) -> int:
-        return self.right_fractal.ordinary_id
+        return self.right_candle.ordinary_id
+
+    @property
+    def left_price(self) -> float:
+        if self.trend == Trend.Bullish:
+            return self.left_candle.low
+        else:
+            return self.left_candle.high
+
+    @property
+    def right_price(self) -> float:
+        if self.trend == Trend.Bullish:
+            return self.right_candle.high
+        else:
+            return self.right_candle.low
 
     @property
     def period(self) -> int:
-        return self.right_fractal.middle_candle.id - self.left_fractal.middle_candle.id
+        return self.right_candle.id - self.left_candle.id
 
     @property
     def period_ordinary(self) -> int:
@@ -188,8 +213,8 @@ class Stroke:
 
     def __str__(self) -> str:
         return f'Stroke (id = {self.id}, trend = {self.trend.value}, period = {self.period}, ' \
-               f'left merged id = {self.left_fractal.middle_candle.id}, ' \
-               f'right merged id = {self.right_fractal.middle_candle.id}, ' \
+               f'left merged id = {self.left_ordinary_id}, ' \
+               f'right merged id = {self.right_merged_id}, ' \
                f'left ordinary id = {self.left_ordinary_id}, ' \
                f'right ordinary id = {self.right_ordinary_id}, ' \
                f'left price = {self.left_price}, right price = {self.right_price})'
@@ -199,41 +224,47 @@ class Stroke:
 class Segment:
     id: int
     trend: Trend
-    left_stroke: Stroke
-    right_stroke: Stroke
-    strokes: List[int]
+    left_candle: MergedCandle
+    right_candle: MergedCandle
+    stroke_id_list: List[int]
 
     @property
-    def left_fractal(self) -> Fractal:
-        return self.left_stroke.left_fractal
+    def left_merged_id(self) -> int:
+        return self.left_candle.id
 
     @property
-    def right_fractal(self) -> Fractal:
-        return self.right_stroke.right_fractal
-
-    @property
-    def left_price(self) -> float:
-        return self.left_stroke.left_price
-
-    @property
-    def right_price(self) -> float:
-        return self.right_stroke.right_price
+    def right_merged_id(self) -> int:
+        return self.right_candle.id
 
     @property
     def left_ordinary_id(self) -> int:
-        return self.left_stroke.left_ordinary_id
+        return self.left_candle.ordinary_id
 
     @property
     def right_ordinary_id(self) -> int:
-        return self.right_stroke.right_ordinary_id
+        return self.right_candle.ordinary_id
 
     @property
     def strokes_count(self) -> int:
-        return len(self.strokes)
+        return len(self.stroke_id_list)
 
     @property
     def period(self) -> int:
         return self.right_ordinary_id - self.left_ordinary_id
+
+    @property
+    def left_price(self) -> float:
+        if self.trend == Trend.Bullish:
+            return self.left_candle.low
+        else:
+            return self.left_candle.high
+
+    @property
+    def right_price(self) -> float:
+        if self.trend == Trend.Bullish:
+            return self.right_candle.high
+        else:
+            return self.right_candle.low
 
     @property
     def price_range(self) -> float:
@@ -245,9 +276,11 @@ class Segment:
 
     def __str__(self) -> str:
         return f'Segment (id = {self.id}, trend = {self.trend.value}, ' \
+               f'left merged id = {self.left_merged_id}, ' \
+               f'right merged id = {self.right_merged_id}, ' \
                f'left ordinary id = {self.left_ordinary_id}, ' \
                f'right ordinary id = {self.right_ordinary_id}, ' \
-               f'count of strokes = {self.strokes_count}, strokes = {self.strokes})'
+               f'count of strokes = {self.strokes_count}, strokes = {self.stroke_id_list})'
 
 
 @dataclass
@@ -272,26 +305,26 @@ class IsolationLine:
 @dataclass
 class Pivot:
     id: int
-    left: Fractal
-    right: Fractal
+    left_candle: MergedCandle
+    right_candle: MergedCandle
     high: float
     low: float
 
     @property
+    def left_merged_id(self) -> int:
+        return self.left_candle.id
+
+    @property
+    def right_merged_id(self) -> int:
+        return self.right_candle.id
+
+    @property
     def left_ordinary_id(self) -> int:
-        return self.left.ordinary_id
+        return self.left_candle.ordinary_id
 
     @property
     def right_ordinary_id(self) -> int:
-        return self.right.ordinary_id
-
-    @property
-    def left_price(self) -> float:
-        return self.left.extreme_price
-
-    @property
-    def right_price(self) -> float:
-        return self.right.extreme_price
+        return self.right_candle.ordinary_id
 
     @property
     def period(self) -> int:
@@ -299,7 +332,7 @@ class Pivot:
 
     @property
     def price_range(self) -> float:
-        return self.right_price - self.left_price
+        return self.high - self.low
 
     @property
     def slope(self) -> float:
@@ -313,22 +346,155 @@ class Pivot:
                f'right ordinary idx = {self.right_ordinary_id})'
 
 
-@dataclass
-class Chan:
-    merged_candles: List[MergedCandle]
-    fractals: List[Fractal]
-    strokes: List[Stroke]
-    segments: List[Segment]
-    isolation_lines: List[IsolationLine]
-    stroke_pivots: List[Pivot]
-    segment_pivots: List[Pivot]
+class ChanTheory:
+    _strict_mode: bool
+    _minimum_distance: int
+    _merged_candles: List[MergedCandle]
+    _fractals: List[Fractal]
+    _strokes: List[Stroke]
+    _segments: List[Segment]
+    _isolation_lines: List[IsolationLine]
+    _stroke_pivots: List[Pivot]
+    _segment_pivots: List[Pivot]
 
+    def __init__(self, strict_mode: bool = True):
+        """
+        Initialize the object.
 
-OrdinaryCandleList = List[OrdinaryCandle]   # 普通K线序列
-MergedCandleList = List[MergedCandle]       # 已合并K线序列
-FractalList = List[Fractal]                 # 分型序列
-StrokeList = List[Stroke]                   # 笔序列
-SegmentList = List[Segment]                 # 线段序列
-IsolationLineList = List[IsolationLine]
-StrokePivotList = List[Pivot]
-SegmentPivotList = List[Pivot]
+        :param strict_mode:
+        """
+        self._strict_mode = strict_mode
+        self._minimum_distance = 4 if strict_mode else 3
+        self._merged_candles = []
+        self._fractals = []
+        self._strokes = []
+        self._segments = []
+        self._isolation_lines = []
+        self._stroke_pivots = []
+        self._segment_pivots = []
+
+    @property
+    def merged_candles_count(self) -> int:
+        """
+        Count of the merged candles list.
+
+        :return: int.
+        """
+        return len(self._merged_candles)
+
+    @property
+    def merged_candles(self) -> List[MergedCandle]:
+        """
+        The merged candle list.
+
+        :return:
+        """
+        return deepcopy(self._merged_candles)
+
+    @property
+    def fractals_count(self) -> int:
+        """
+        Count of the fractals list.
+
+        :return:
+        """
+        return len(self._fractals)
+
+    @property
+    def fractals(self) -> List[Fractal]:
+        """
+        The fractal list.
+
+        :return:
+        """
+        return deepcopy(self._fractals)
+
+    @property
+    def strokes_count(self) -> int:
+        """
+        Count of the strokes list.
+
+        :return:
+        """
+        return len(self._strokes)
+
+    @property
+    def strokes(self) -> List[Stroke]:
+        """
+        The stroke list.
+
+        :return:
+        """
+        return deepcopy(self._strokes)
+
+    @property
+    def segments_count(self) -> int:
+        """
+        Count of the segments list.
+
+        :return:
+        """
+        return len(self._segments)
+
+    @property
+    def segments(self) -> List[Segment]:
+        """
+        The segment list.
+
+        :return:
+        """
+        return deepcopy(self._segments)
+
+    @property
+    def isolation_lines_count(self) -> int:
+        """
+        Count of the isolation lines list.
+
+        :return:
+        """
+        return len(self._isolation_lines)
+
+    @property
+    def isolation_lines(self) -> List[IsolationLine]:
+        """
+        The isolation lines list.
+
+        :return:
+        """
+        return deepcopy(self._isolation_lines)
+
+    @property
+    def stroke_pivots_count(self) -> int:
+        """
+        Count of the stroke pivots list.
+
+        :return:
+        """
+        return len(self._stroke_pivots)
+
+    @property
+    def stroke_pivots(self) -> List[Pivot]:
+        """
+        Count of the segment pivots list.
+
+        :return:
+        """
+        return deepcopy(self._stroke_pivots)
+
+    @property
+    def segment_pivots_count(self) -> int:
+        """
+        Count of the segment pivots list.
+
+        :return:
+        """
+        return len(self._segment_pivots)
+
+    @property
+    def segment_pivots(self) -> List[Pivot]:
+        """
+        The segment pivots list.
+
+        :return:
+        """
+        return deepcopy(self._segment_pivots)

@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -18,24 +18,14 @@ from .definition import (
     Fractal,
     Stroke,
     Segment,
+    IsolationLine,
+    Pivot,
 
-    MergedCandleList,
-    FractalList,
-    StrokeList,
-    SegmentList,
-    IsolationLineList,
-    StrokePivotList,
-    SegmentPivotList,
-
-    Chan,
+    ChanTheory,
 )
 from .utility import (
     is_inclusive_candle,
-    is_overlap,
-    generate_segment,
-    generate_isolation_line,
-    generate_stroke_pivot,
-    generate_segment_pivot,
+    is_overlap
 )
 from .log_message import (
     LOG_CANDLE_GENERATED,
@@ -53,13 +43,13 @@ from .log_message import (
 )
 
 
-def generate_merged_candles(
+def update_merged_candles(
         df: pd.DataFrame,
-        chan: Chan,
+        chan: ChanTheory,
         log: bool = False
-) -> Chan:
+) -> ChanTheory:
     """
-    Generate merged candles for Chan Theory.
+    Update (generate or merge) merged candles for Chan Theory.
 
     :param df: pandas DatFrame. The ordinary bar data.
     :param chan: Chan. The Chan Theory data.
@@ -70,7 +60,7 @@ def generate_merged_candles(
     count: int = len(df)
     width: int = len(str(count - 1)) + 1
 
-    merged_candles: MergedCandleList = []
+    merged_candles: List[MergedCandle] = []
 
     ordinary_candle: OrdinaryCandle
 
@@ -251,18 +241,18 @@ def generate_merged_candles(
                         f'high={merged_candles[-1].high}，low={merged_candles[-1].low}。'
                     )
 
-    result: Chan = chan
-    result.merged_candles = merged_candles
+    result: ChanTheory = chan
+    result._merged_candles = merged_candles
     return chan
 
 
-def generate_fractals(
-        chan: Chan,
+def update_fractals(
+        chan: ChanTheory,
         log: bool = False,
         verbose: bool = False
-) -> Chan:
+) -> ChanTheory:
     """
-    Generate fractals for Chan Theory.
+    Update (generate, confirm or drop) fractals for Chan Theory.
 
     :param chan:
     :param log:
@@ -279,7 +269,7 @@ def generate_fractals(
     count: int = len(chan.merged_candles)
     width: int = len(str(count - 1)) + 1
 
-    fractals: FractalList = []
+    fractals: List[Fractal] = []
     merged_candle: MergedCandle
 
     if log:
@@ -299,46 +289,46 @@ def generate_fractals(
 
         # 如果分型数量 > 0 且 最新分型未确认：
         if fractal_count > 0 and last_fractal.is_confirmed is False:
+            if verbose:
+                print(
+                    f'\n  ○ 尝试丢弃分型：'
+                    f'\n    分型数量 > 0，最新分型 未被确认。'
+                )
+
+            is_dropped: bool = False
             last_merged_candle: MergedCandle = chan.merged_candles[idx]
 
             # 如果当前合并K线顺向突破（即最高价大于顶分型中间K线的最高价，对底分型反之）。
             if last_fractal.pattern == FractalPattern.Top and \
                     last_merged_candle.high >= last_fractal.middle_candle.high:
-                if log:
-                    print(
-                        LOG_FRACTAL_DROPPED.format(
-                            extreme_type='最高价',
-                            price=last_merged_candle.high,
-                            id=last_fractal.id,
-                            pattern=last_fractal.pattern,
-                            extreme_price=last_fractal.extreme_price
-                        )
-                    )
-
-                # 丢弃前分型。
-                fractals.remove(last_fractal)
-                # 重新统计分型数量。
-                fractal_count = 0 if fractals is None else len(fractals)
-                # 重新索引前分型。
-                last_fractal = fractals[-1] if fractal_count >= 1 else None
+                is_dropped = True
 
             elif last_fractal.pattern == FractalPattern.Bottom and \
                     last_merged_candle.low <= last_fractal.middle_candle.low:
+                is_dropped = True
+
+            if is_dropped:
                 if log:
+                    if last_fractal.pattern == FractalPattern.Top:
+                        extreme_type = '最高价'
+                        price = last_merged_candle.high
+                    else:
+                        extreme_type = '最低价'
+                        price = last_merged_candle.low
+
                     print(
                         LOG_FRACTAL_DROPPED.format(
-                            extreme_type='最低价',
-                            price=last_merged_candle.low,
+                            extreme_type=extreme_type,
+                            price=price,
                             id=last_fractal.id,
                             pattern=last_fractal.pattern,
                             extreme_price=last_fractal.extreme_price
                         )
                     )
-
                 # 丢弃前分型。
                 fractals.remove(last_fractal)
                 # 重新统计分型数量。
-                fractal_count = 0 if fractals is None else len(fractals)
+                fractal_count = len(fractals)
                 # 重新索引前分型。
                 last_fractal = fractals[-1] if fractal_count >= 1 else None
 
@@ -393,8 +383,7 @@ def generate_fractals(
                 #     1. 不能和前分型重复（中间K线一样） -> 和前分型有足够距离
                 #     2. 不接受同向分型（除非极值跟大，但这样在前面就被丢弃了）
                 #     3. 前分型未被确认的时候不接受反向分型 -> 取消确认一说。
-                distance = chan.merged_candles.index(new_fractal.middle_candle) - \
-                           chan.merged_candles.index(last_fractal.middle_candle)
+                distance = new_fractal.middle_candle.id - last_fractal.middle_candle.id
                 if distance >= 4:  # and new_fractal.type_ != last_fractal.type_:
                     last_fractal.is_confirmed = True
                     fractals.append(new_fractal)
@@ -409,16 +398,16 @@ def generate_fractals(
                             )
                         )
 
-    result: Chan = chan
-    result.fractals = fractals
+    result: ChanTheory = chan
+    result._fractals = fractals
     return result
 
 
 def generate_strokes(
-        chan: Chan,
+        chan: ChanTheory,
         log: bool = False,
         verbose: bool = False
-) -> Chan:
+) -> ChanTheory:
     """
     Generate stroke for Chan Theory.
 
@@ -433,7 +422,7 @@ def generate_strokes(
     count: int = len(chan.fractals)
     width: int = len(str(count - 1)) + 1
 
-    strokes: StrokeList = []
+    strokes: List[Stroke] = []
 
     for idx in range(1, count):
         if log:
@@ -451,22 +440,22 @@ def generate_strokes(
         new_stroke: Stroke = Stroke(
             id=strokes_count,
             trend=trend,
-            left_fractal=left_fractal,
-            right_fractal=right_fractal
+            left_candle=left_fractal.middle_candle,
+            right_candle=right_fractal.middle_candle
         )
 
         strokes.append(new_stroke)
 
-    result: Chan = chan
-    result.strokes = strokes
+    result: ChanTheory = chan
+    result._strokes = strokes
     return result
 
 
 def generate_segments(
-        chan: Chan,
+        chan: ChanTheory,
         log: bool = False,
         verbose: bool = False
-) -> Chan:
+) -> ChanTheory:
     """
     Generate segments for Chan Theory.
 
@@ -482,7 +471,7 @@ def generate_segments(
         if verbose:
             print('Length of strokes less 3.')
 
-    segments: SegmentList = []
+    segments: List[Segment] = []
 
     for idx in range(2, len(chan.strokes)):
         segments_count: int = 0 if segments is None else len(segments)
@@ -507,9 +496,9 @@ def generate_segments(
                 new_segment: Segment = Segment(
                     id=segments_count,
                     trend=left_stroke.trend,
-                    left_stroke=left_stroke,
-                    right_stroke=right_strokes,
-                    strokes=[left_stroke.id, middle_stroke.id, right_strokes.id]
+                    left_candle=left_stroke.left_candle,
+                    right_candle=right_strokes.right_candle,
+                    stroke_id_list=[left_stroke.id, middle_stroke.id, right_strokes.id]
                 )
 
                 segments.append(new_segment)
@@ -519,8 +508,8 @@ def generate_segments(
                         LOG_STROKE_GENERATED.format(
                             id=new_segment.id + 1,
                             trend=new_segment.trend,
-                            left_mc_id=new_segment.left_stroke.left_fractal.middle_candle.id,
-                            right_mc_id=new_segment.right_stroke.right_fractal.middle_candle.id,
+                            left_mc_id=new_segment.left_merged_id,
+                            right_mc_id=new_segment.right_merged_id,
                             left_oc_id=new_segment.left_ordinary_id,
                             right_oc_id=new_segment.right_ordinary_id
                         )
@@ -533,7 +522,7 @@ def generate_segments(
         else:
             # 申明变量类型并赋值。
             last_segment: Segment = segments[-1]
-            last_stroke_in_segment: Stroke = chan.strokes[last_segment.strokes[-1]]
+            last_stroke_in_segment: Stroke = chan.strokes[last_segment.stroke_id_list[-1]]
             last_stroke: Stroke = chan.strokes[idx]
 
             # 顺向突破，延伸线段。
@@ -560,8 +549,8 @@ def generate_segments(
                         LOG_SEGMENT_EXPANDED.format(
                             id=last_segment.id + 1,
                             trend=last_segment.trend,
-                            old_mc_id=last_stroke_in_segment.right_fractal.middle_candle.id,
-                            new_mc_id=last_stroke.right_fractal.middle_candle.id,
+                            old_mc_id=last_stroke_in_segment.right_merged_id,
+                            new_mc_id=last_stroke.right_merged_id,
                             old_oc_id=last_stroke_in_segment.right_ordinary_id,
                             new_oc_id=last_stroke.right_ordinary_id,
                             new_strokes=[
@@ -574,8 +563,8 @@ def generate_segments(
                     )
 
                 # 增加线段的笔。
-                for i in range(last_segment.right_stroke.id + 1, last_stroke.id + 1):
-                    last_segment.strokes.append(i)
+                for i in range(last_segment.stroke_id_list[-1] + 1, last_stroke.id + 1):
+                    last_segment.stroke_id_list.append(i)
 
                 # 移动线段的右侧笔。
                 last_segment.right_stroke = last_stroke
@@ -583,7 +572,7 @@ def generate_segments(
                 continue
 
             # 反向突破，生成反向线段。
-            if last_stroke.id - last_segment.right_stroke.id == 3:
+            if last_stroke.id - last_segment.stroke_id_list[-1] == 3:
                 left_stroke: Stroke = chan.strokes[-3]
                 middle_stroke: Stroke = chan.strokes[-2]
                 right_stroke: Stroke = chan.strokes[-1]
@@ -631,9 +620,9 @@ def generate_segments(
                     new_segment = Segment(
                         id=segments_count,
                         trend=right_stroke.trend,
-                        left_stroke=left_stroke,
-                        right_stroke=right_stroke,
-                        strokes=[left_stroke.id, middle_stroke.id, right_stroke.id]
+                        left_candle=left_stroke.left_candle,
+                        right_candle=right_stroke.right_candle,
+                        stroke_id_list=[left_stroke.id, middle_stroke.id, right_stroke.id]
                     )
                     segments.append(new_segment)
 
@@ -644,7 +633,7 @@ def generate_segments(
                                 trend=new_segment.trend,
                                 left=new_segment.left_ordinary_id,
                                 right=new_segment.right_ordinary_id,
-                                strokes=new_segment.strokes
+                                strokes=new_segment.stroke_id_list
                             )
                         )
 
@@ -675,53 +664,53 @@ def generate_segments(
             if True:
                 pass
 
-    result: Chan = chan
-    result.segments = segments
+    result: ChanTheory = chan
+    result._segments = segments
     return result
 
 
 def generate_isolation_lines(
-        chan: Chan,
+        chan: ChanTheory,
         log: bool = False,
         verbose: bool = False
-) -> Chan:
+) -> ChanTheory:
 
-    isolation_lines: IsolationLineList = []
+    isolation_lines: List[IsolationLine] = []
 
     pass
 
-    result: Chan = chan
-    result.isolation_lines = isolation_lines
+    result: ChanTheory = chan
+    result._isolation_lines = isolation_lines
     return result
 
 
 def generate_stroke_pivots(
-        chan: Chan,
+        chan: ChanTheory,
         log: bool = False,
         verbose: bool = False
-) -> Chan:
+) -> ChanTheory:
 
-    stroke_pivots: StrokePivotList = []
+    stroke_pivots: List[Pivot] = []
 
     pass
 
-    result: Chan = chan
-    result.stroke_pivots = stroke_pivots
+    result: ChanTheory = chan
+    result._stroke_pivots = stroke_pivots
     return result
 
 
 def generate_segment_pivots(
-        chan: Chan,
+        chan: ChanTheory,
         log: bool = False,
         verbose: bool = False
-) -> Chan:
+) -> ChanTheory:
 
-    segment_pivots: SegmentPivotList = []
+    segment_pivots: List[Pivot] = []
 
     pass
 
-    result: Chan = chan
-    result.segment_pivots = segment_pivots
+    result: ChanTheory = chan
+    result._segment_pivots = segment_pivots
     return result
 
 
@@ -736,56 +725,51 @@ log_settings: Dict[str, bool] = {
 
 def run_with_dataframe(
         df: pd.DataFrame,
+        strict_mode: bool = True,
         log: bool = False,
         verbose: bool = False
-) -> Chan:
+) -> ChanTheory:
     """
     Run with pandas DataFrame statically.
 
     :param df:
+    :param strict_mode: bool. True means the distance between two fractals should be large than 5.
+                        False means 4 at least.
     :param log:
     :param verbose:
     :return:
     """
-    result: Chan = Chan(
-        merged_candles=[],
-        fractals=[],
-        strokes=[],
-        segments=[],
-        isolation_lines=[],
-        stroke_pivots=[],
-        segment_pivots=[],
-    )
+    chan_static: ChanTheory = ChanTheory(strict_mode=strict_mode)
 
     ordinary_candle: OrdinaryCandle
     action: Action
 
     if log:
         print('\n====================\n生成合并K线\n====================')
-    result = generate_merged_candles(df, result, log)
+    chan_static = update_merged_candles(df, chan_static, log)
 
     if log:
         print('\n====================\n生成分型\n====================')
-    result = generate_fractals(result, log, verbose)
+    chan_static = update_fractals(chan_static, log, verbose)
 
     if log:
         print('\n====================\n生成笔\n====================')
-    result = generate_strokes(result, log, verbose)
+    chan_static = generate_strokes(chan_static, log, verbose)
 
     if log:
         print('\n====================\n生成线段\n====================')
-    result = generate_segments(result, log, verbose)
+    chan_static = generate_segments(chan_static, log, verbose)
 
     if log:
         print('\n====================\n生成同级别分解线\n====================')
-    result = generate_isolation_lines(result, log, verbose)
+    chan_static = generate_isolation_lines(chan_static, log, verbose)
 
     if log:
         print('\n====================\n生成笔中枢\n====================')
-    result = generate_stroke_pivots(result, log, verbose)
+    chan_static = generate_stroke_pivots(chan_static, log, verbose)
 
     if log:
         print('\n====================\n生成段中枢\n====================')
-    result = generate_segment_pivots(result, log, verbose)
+    chan_static = generate_segment_pivots(chan_static, log, verbose)
 
-    return result
+    return chan_static

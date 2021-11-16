@@ -4,7 +4,6 @@ __author__ = 'Bruce Frank Wong'
 
 
 from typing import Dict, List, Tuple, Optional
-from copy import deepcopy
 from dataclasses import dataclass
 
 import numpy as np
@@ -15,12 +14,18 @@ import mplfinance as mpf
 
 from .definition import (
     Action,
+    FirstOrLast,
     FractalPattern,
     Trend,
     OrdinaryCandle,
     MergedCandle,
     Fractal,
+    Stroke,
+    Segment,
+    Pivot,
     IsolationLine,
+
+    ChanTheory,
 )
 from .log_message import (
     LOG_CANDLE_GENERATED,
@@ -33,6 +38,10 @@ from .log_message import (
     LOG_SEGMENT_EXPANDED,
     LOG_ISOLATION_LINE_GENERATED,
     LOG_STROKE_PIVOT_GENERATED,
+)
+from .utility import (
+    is_regular_fractal,
+    is_potential_fractal,
 )
 
 
@@ -63,317 +72,26 @@ class PotentialFractal:
                f'extreme price = {self.extreme_price})'
 
 
-@dataclass
-class Stroke:
-    id: int
-    trend: Trend
-    left_candle: MergedCandle
-    right_candle: MergedCandle
-
-    @property
-    def left_price(self) -> float:
-        if self.trend == Trend.Bullish:
-            return self.left_candle.low
-        else:
-            return self.left_candle.high
-
-    @property
-    def right_price(self) -> float:
-        if self.trend == Trend.Bullish:
-            return self.right_candle.high
-        else:
-            return self.right_candle.low
-
-    @property
-    def left_ordinary_id(self) -> int:
-        return self.left_candle.ordinary_id
-
-    @property
-    def right_ordinary_id(self) -> int:
-        return self.right_candle.ordinary_id
-
-    @property
-    def period(self) -> int:
-        return self.right_candle.id - self.left_candle.id
-
-    @property
-    def period_ordinary(self) -> int:
-        return self.right_ordinary_id - self.left_ordinary_id
-
-    @property
-    def price_range(self) -> float:
-        return self.right_price - self.left_price
-
-    @property
-    def slope_ordinary(self) -> float:
-        return self.price_range / self.period_ordinary
-
-    def __str__(self) -> str:
-        return f'Stroke (id = {self.id}, trend = {self.trend.value}, period = {self.period}, ' \
-               f'left merged id = {self.left_candle.id}, ' \
-               f'right merged id = {self.right_candle.id}, ' \
-               f'left ordinary id = {self.left_ordinary_id}, ' \
-               f'right ordinary id = {self.right_ordinary_id}, ' \
-               f'left price = {self.left_price}, right price = {self.right_price})'
-
-
-@dataclass
-class Segment:
-    id: int
-    trend: Trend
-    left_candle: MergedCandle
-    right_candle: MergedCandle
-    stroke_id_list: List[int]
-
-    @property
-    def left_price(self) -> float:
-        if self.trend == Trend.Bullish:
-            return self.left_candle.low
-        else:
-            return self.left_candle.high
-
-    @property
-    def right_price(self) -> float:
-        if self.trend == Trend.Bullish:
-            return self.right_candle.high
-        else:
-            return self.right_candle.low
-
-    @property
-    def left_ordinary_id(self) -> int:
-        return self.left_candle.ordinary_id
-
-    @property
-    def right_ordinary_id(self) -> int:
-        return self.right_candle.ordinary_id
-
-    @property
-    def strokes_count(self) -> int:
-        return len(self.stroke_id_list)
-
-    @property
-    def period(self) -> int:
-        return self.right_ordinary_id - self.left_ordinary_id
-
-    @property
-    def price_range(self) -> float:
-        return self.right_price - self.left_price
-
-    @property
-    def slope(self) -> float:
-        return self.price_range / self.period
-
-    def __str__(self) -> str:
-        return f'Segment (id={self.id}, trend={self.trend.value}, ' \
-               f'left ordinary id = {self.left_ordinary_id}, ' \
-               f'right ordinary id = {self.right_ordinary_id}, ' \
-               f'count of strokes = {self.strokes_count}, strokes = {self.stroke_id_list})'
-
-
-@dataclass
-class Pivot:
-    id: int
-    left_candle: MergedCandle
-    right_candle: MergedCandle
-    high: float
-    low: float
-
-    @property
-    def left_ordinary_id(self) -> int:
-        return self.left_candle.ordinary_id
-
-    @property
-    def right_ordinary_id(self) -> int:
-        return self.right_candle.ordinary_id
-
-    @property
-    def period(self) -> int:
-        return self.right_candle.id - self.left_candle.id
-
-    @property
-    def period_ordinary(self) -> int:
-        return self.right_ordinary_id - self.left_ordinary_id
-
-    @property
-    def price_range(self) -> float:
-        return self.high - self.low
-
-    @property
-    def slope(self) -> float:
-        return self.price_range / self.period
-
-    def __str__(self) -> str:
-        return f'Pivot (id = {self.id}, ' \
-               f'high = {self.high}, ' \
-               f'low = {self.low}, ' \
-               f'left ordinary id = {self.left_ordinary_id}, ' \
-               f'right ordinary id = {self.right_ordinary_id})'
-
-
-class ChanTheory:
+class ChanTheoryDynamic(ChanTheory):
     """
     缠论。
     """
 
     _log: bool
     _verbose: bool
-    _strict: bool
-    _minimum_distance: int
-    _merged_candles: List[MergedCandle]
     _potential_fractal: PotentialFractal
-    _fractals: List[Fractal]
-    _strokes: List[Stroke]
-    _segments: List[Segment]
-    _isolation_lines: List[IsolationLine]
-    _stroke_pivots: List[Pivot]
-    _segment_pivots: List[Pivot]
 
-    def __init__(self, strict: bool = True, log: bool = False, verbose: bool = False):
+    def __init__(self, strict_mode: bool = True, log: bool = False, verbose: bool = False):
         """
         Initialize the object.
 
-        :param strict:
+        :param strict_mode:
         :param log:
         :param verbose:
         """
-        self._strict = strict
-        self._minimum_distance = 4 if strict else 3
+        super().__init__(strict_mode)
         self._log = log
         self._verbose = verbose
-
-        self._merged_candles = []
-        self._fractals = []
-        self._strokes = []
-        self._segments = []
-        self._isolation_lines = []
-        self._stroke_pivots = []
-        self._segment_pivots = []
-
-    @property
-    def merged_candles_count(self) -> int:
-        """
-        Count of the merged candles list.
-
-        :return: int.
-        """
-        return len(self._merged_candles)
-
-    @property
-    def merged_candles(self) -> List[MergedCandle]:
-        """
-        The merged candle list.
-
-        :return:
-        """
-        return deepcopy(self._merged_candles)
-
-    @property
-    def fractals_count(self) -> int:
-        """
-        Count of the fractals list.
-
-        :return:
-        """
-        return len(self._fractals)
-
-    @property
-    def fractals(self) -> List[Fractal]:
-        """
-        The fractal list.
-
-        :return:
-        """
-        return deepcopy(self._fractals)
-
-    @property
-    def strokes_count(self) -> int:
-        """
-        Count of the strokes list.
-
-        :return:
-        """
-        return len(self._strokes)
-
-    @property
-    def strokes(self) -> List[Stroke]:
-        """
-        The stroke list.
-
-        :return:
-        """
-        return deepcopy(self._strokes)
-
-    @property
-    def segments_count(self) -> int:
-        """
-        Count of the segments list.
-
-        :return:
-        """
-        return len(self._segments)
-
-    @property
-    def segments(self) -> List[Segment]:
-        """
-        The segment list.
-
-        :return:
-        """
-        return deepcopy(self._segments)
-
-    @property
-    def isolation_lines_count(self) -> int:
-        """
-        Count of the isolation lines list.
-
-        :return:
-        """
-        return len(self._isolation_lines)
-
-    @property
-    def isolation_lines(self) -> List[IsolationLine]:
-        """
-        The isolation lines list.
-
-        :return:
-        """
-        return deepcopy(self._isolation_lines)
-
-    @property
-    def stroke_pivots_count(self) -> int:
-        """
-        Count of the stroke pivots list.
-
-        :return:
-        """
-        return len(self._stroke_pivots)
-
-    @property
-    def stroke_pivots(self) -> List[Pivot]:
-        """
-        Count of the segment pivots list.
-
-        :return:
-        """
-        return deepcopy(self._stroke_pivots)
-
-    @property
-    def segment_pivots_count(self) -> int:
-        """
-        Count of the segment pivots list.
-
-        :return:
-        """
-        return len(self._segment_pivots)
-
-    @property
-    def segment_pivots(self) -> List[Pivot]:
-        """
-        The segment pivots list.
-
-        :return:
-        """
-        return deepcopy(self._segment_pivots)
 
     def is_fractal(self, merged_candle_id: int) -> Tuple[bool, Optional[FractalPattern]]:
         if merged_candle_id <= 0:
@@ -389,26 +107,6 @@ class ChanTheory:
             return True, FractalPattern.Bottom
         else:
             return False, None
-
-    def is_potential_fractal(self,
-                             merged_candle_id: int
-                             ) -> Optional[FractalPattern]:
-        current_candle: MergedCandle = self._merged_candles[merged_candle_id]
-        another_candle: MergedCandle
-        if merged_candle_id == self.merged_candles_count - 1:
-            another_candle = self._merged_candles[merged_candle_id - 1]
-            if current_candle.high > another_candle.high:
-                return FractalPattern.Top
-            elif current_candle.low < another_candle.low:
-                return FractalPattern.Bottom
-        elif merged_candle_id == 0:
-            another_candle = self._merged_candles[1]
-            if another_candle.high > current_candle.high:
-                return FractalPattern.Bottom
-            elif another_candle.low < current_candle.low:
-                return FractalPattern.Top
-        else:
-            return None
 
     def get_ordinary_candle_id(self, merged_candle_id: int) -> Optional[int]:
         return self._merged_candles[merged_candle_id].right_ordinary_id
@@ -433,9 +131,9 @@ class ChanTheory:
         else:
             return True
 
-    def generate_merged_candle(self, ordinary_candle: OrdinaryCandle) -> Action:
+    def update_merged_candle(self, ordinary_candle: OrdinaryCandle) -> Action:
         """
-        Generate the merged candles。
+        Update the merged candles。
 
         :param ordinary_candle:
         :return: Action. If new merged candle was generated, return <Action.MergedCandleGenerated>.
@@ -607,75 +305,87 @@ class ChanTheory:
             b, f = self.is_fractal(i)
             print(i, b, f)
 
-    def generate_fractal(self) -> Action:
+    def update_fractals(self) -> Action:
         """
-        Generate the fractals.
+        Update the fractals and/or strokes.
 
-        :return: Action. Return <Action.FractalGenerated> if a new fractal was generated.
+        :return: Action.
+                 Return <Action.FractalGenerated> if a new fractal was generated.
                  Return <Action.FractalConfirmed> if a existed fractal was confirmed.
                  Return <Action.FractalDropped> if a existed fractal was dropped.
                  Return <Action.NothingChanged> if nothing was changed.
         """
+        # 如果 合并K线数量 < 3：退出，返回 <Action.NothingChanged>。
         if self.merged_candles_count < 3:
-            return Action.NothingChanged
-
-        # 声明变量类型且赋值。
-        new_fractal: Optional[Fractal]
-        left_candle = self._merged_candles[-3]
-        middle_candle = self._merged_candles[-2]
-        right_candle = self._merged_candles[-1]
-
-        # 如果：
-        #     最新的合并K线的id == 最新的分型的右侧合并K线的id
-        # 退出
-        if self.fractals_count >= 1 and \
-                self._merged_candles[-1].id == self._fractals[-1].id - 1:
-            return Action.NothingChanged
-
-        # 如果：
-        #     中间K线的最高价比左右K线的最高价都高：
-        # 顶分型。
-        if middle_candle.high > left_candle.high and middle_candle.high > right_candle.high:
-            new_fractal = Fractal(
-                id=self.fractals_count,
-                pattern=FractalPattern.Top,
-                left_candle=left_candle,
-                middle_candle=middle_candle,
-                right_candle=right_candle,
-                is_confirmed=False
-            )
-
-        # 如果：
-        #     中间K线的最低价比左右K线的最低价都低：
-        # 底分型。
-        elif middle_candle.low < left_candle.low and middle_candle.low < right_candle.low:
-            new_fractal = Fractal(
-                id=self.fractals_count,
-                pattern=FractalPattern.Bottom,
-                left_candle=left_candle,
-                middle_candle=middle_candle,
-                right_candle=right_candle,
-                is_confirmed=False
-            )
-
-        # 否则不是分型。
-        else:
-            new_fractal = None
-
-        if new_fractal is not None:
-            self._fractals.append(new_fractal)
-
-            if self._log:
+            if self._verbose:
                 print(
-                    LOG_FRACTAL_GENERATED.format(
-                        id=new_fractal.id + 1,
-                        pattern=new_fractal.pattern.value,
-                        merged_candle_id=new_fractal.merged_id,
-                        ordinary_id=new_fractal.ordinary_id
+                    f'\n  ○ 尝试生成分型：目前共有合并K线 {self.merged_candles_count} 个，最少需要 3 个。'
+                )
+            return Action.NothingChanged
+
+        # 如果 分型数量 > 0：
+        #     1. 尝试生成笔；
+        #     2. 替代潜在分型；
+        #     3. 生成新分型
+        if self.fractals_count >= 1:
+            # 如果 合并K线的数量 < 最小距离 + 1： 退出。
+            if self.merged_candles_count < self._minimum_distance + 1:
+                if self._verbose:
+                    print(
+                        f'\n  ○ 尝试生成笔：目前共有合并K线 {self.merged_candles_count} 根，'
+                        f'最少需要 {self._minimum_distance + 1} 根。'
                     )
+            else:
+                last_candle: MergedCandle = self._merged_candles[-1]
+                succeed: bool
+                potential_fractal: FractalPattern
+                succeed, potential_fractal, _ = is_potential_fractal(
+                    FirstOrLast.Last, self._merged_candles
+                )
+                if self._verbose:
+                    print(
+                        f'\n  ○ 尝试生成笔：\n    最新合并K线，'
+                        f'merged id（合并K线）= {last_candle.id}，'
+                        f'ordinary id（普通K线）= {last_candle.ordinary_id}，'
+                        f'潜在分型 = {potential_fractal}。'
+                    )
+
+            if self._merged_candles[-1].id == self._fractals[-1].id - 1:
+                return Action.NothingChanged
+
+        # 如果 分型数量 == 0：尽可能生成分型。
+        if self.fractals_count == 0:
+            # 声明变量类型且赋值。
+            left_candle: MergedCandle = self._merged_candles[-3]
+            middle_candle: MergedCandle = self._merged_candles[-2]
+            right_candle: MergedCandle = self._merged_candles[-1]
+
+            succeed: bool
+            pattern: FractalPattern
+            succeed, pattern = is_regular_fractal(left_candle, middle_candle, right_candle)
+            if succeed:
+                new_fractal: Fractal = Fractal(
+                    id=self.fractals_count,
+                    pattern=pattern,
+                    left_candle=left_candle,
+                    middle_candle=middle_candle,
+                    right_candle=right_candle,
+                    is_confirmed=False
                 )
 
-        return Action.FractalGenerated
+                self._fractals.append(new_fractal)
+
+                if self._log:
+                    print(
+                        LOG_FRACTAL_GENERATED.format(
+                            id=new_fractal.id + 1,
+                            pattern=new_fractal.pattern.value,
+                            merged_id=new_fractal.merged_id,
+                            ordinary_id=new_fractal.ordinary_id
+                        )
+                    )
+
+            return Action.FractalGenerated
 
     def generate_first_stroke(self) -> Action:
         """
@@ -686,7 +396,7 @@ class ChanTheory:
         # Define verbose message.
         verbose_message: Dict[str, str] = {
             'not_enough_merged_candle':
-                '\n  ○ 尝试生成笔：目前仅有 {count} 根合并K线，最少需要 {minimum} 根。',
+                '\n  ○ 尝试生成笔：目前共有合并K线 {count} 根，最少需要 {minimum} 根。',
             'right_merged_candle':
                 '\n  ○ 尝试生成笔：\n'
                 '    最新合并K线，merged id（合并K线）= {mc_id}，ordinary id（普通K线）= {oc_id}，'
@@ -712,8 +422,10 @@ class ChanTheory:
 
         # 申明变量类型并赋值。
         right_merged_candle: MergedCandle = self._merged_candles[-1]
-        right_fractal_pattern: FractalPattern = self.is_potential_fractal(
-            right_merged_candle.id
+        succeed: bool
+        right_fractal_pattern: FractalPattern
+        succeed, right_fractal_pattern, _ = is_potential_fractal(
+            FirstOrLast.Last, self._merged_candles
         )
         # valid_fractal: bool
 
@@ -837,7 +549,9 @@ class ChanTheory:
         # 申明变量类型并赋值。
         last_stroke: Stroke = self._strokes[-1]
         last_merged_candle: MergedCandle = self._merged_candles[-1]
-        potential_fractal: FractalPattern = self.is_potential_fractal(last_merged_candle.id)
+        succeed: bool
+        potential_fractal: Optional[FractalPattern] = None
+        succeed, pattern, _ = is_potential_fractal(FirstOrLast.Last, self._merged_candles)
 
         # 如果：
         #     A1. last_stroke 的 trend 是 上升，且
@@ -855,7 +569,7 @@ class ChanTheory:
                     right_candle_id=last_stroke.right_candle.id,
                     right_price=last_stroke.right_price,
                     merged_candle_id=last_merged_candle.id,
-                    potential_fractal=potential_fractal.value,
+                    potential_fractal=potential_fractal.value if potential_fractal else '不存在',
                     high=last_merged_candle.high,
                     low=last_merged_candle.low
                 )
@@ -899,7 +613,12 @@ class ChanTheory:
         last_stroke: Stroke = self._strokes[-1]
 
         distance = last_merged_candle.id - last_stroke.right_candle.id
-        potential_fractal: FractalPattern = self.is_potential_fractal(last_merged_candle.id)
+        succeed: bool
+        potential_fractal: Optional[FractalPattern]
+        succeed, potential_fractal, _ = is_potential_fractal(
+            FirstOrLast.Last,
+            self._merged_candles
+        )
 
         if self._verbose:
             print(
@@ -908,7 +627,7 @@ class ChanTheory:
                 f'右侧合并K线 id= {last_stroke.right_candle.id}，'
                 f'idx = {last_stroke.right_ordinary_id}'
                 f'\n    最新合并K线 id = {last_merged_candle.id}，'
-                f'潜在分型 = {potential_fractal.value}，'
+                f'潜在分型 = {potential_fractal.value if potential_fractal else "不存在"}，'
                 f'idx = {last_merged_candle.ordinary_id}，距离 = {distance}'
             )
 
@@ -1078,8 +797,8 @@ class ChanTheory:
                 LOG_SEGMENT_GENERATED.format(
                     id=new_segment.id + 1,
                     trend=new_segment.trend,
-                    left_mc_id=new_segment.left_candle.id,
-                    right_mc_id=new_segment.right_candle.id,
+                    left_mc_id=new_segment.left_merged_id,
+                    right_mc_id=new_segment.right_merged_id,
                     left_oc_id=new_segment.left_ordinary_id,
                     right_oc_id=new_segment.right_ordinary_id,
                     strokes=new_segment.stroke_id_list
@@ -1366,8 +1085,8 @@ class ChanTheory:
                     LOG_SEGMENT_GENERATED.format(
                         id=new_segment.id + 1,
                         trend=new_segment.trend,
-                        left_mc_id=new_segment.left_candle.id,
-                        right_mc_id=new_segment.right_candle.id,
+                        left_mc_id=new_segment.left_merged_id,
+                        right_mc_id=new_segment.right_merged_id,
                         left_oc_id=new_segment.left_ordinary_id,
                         right_oc_id=new_segment.right_ordinary_id,
                         strokes=new_segment.stroke_id_list
@@ -1439,7 +1158,7 @@ class ChanTheory:
                             LOG_SEGMENT_EXPANDED.format(
                                 id=last_segment.id + 1,
                                 trend=last_segment.trend,
-                                old_mc_id=last_segment.right_candle.id,
+                                old_mc_id=last_segment.right_merged_id,
                                 new_mc_id=stroke_right.right_candle.id,
                                 old_oc_id=last_segment.right_ordinary_id,
                                 new_oc_id=stroke_right.right_ordinary_id,
@@ -1466,7 +1185,7 @@ class ChanTheory:
                         trend=Trend.Bearish
                         if stroke_right.trend == Trend.Bullish else Trend.Bullish,
                         left_candle=last_segment.right_candle,
-                        right_candle=stroke_left.right_candle,
+                        right_candle=stroke_left.left_candle,
                         stroke_id_list=[
                             i for i in range(last_stroke_in_segment.id + 1, stroke_left.id)
                         ]
@@ -1478,8 +1197,8 @@ class ChanTheory:
                             LOG_SEGMENT_GENERATED.format(
                                 id=new_segment.id + 1,
                                 trend=new_segment.trend,
-                                left_mc_id=new_segment.left_candle.id,
-                                right_mc_id=new_segment.right_candle.id,
+                                left_mc_id=new_segment.left_merged_id,
+                                right_mc_id=new_segment.right_merged_id,
                                 left_oc_id=new_segment.left_ordinary_id,
                                 right_oc_id=new_segment.right_ordinary_id,
                                 strokes=new_segment.stroke_id_list
@@ -1505,8 +1224,8 @@ class ChanTheory:
                         LOG_SEGMENT_GENERATED.format(
                             id=new_segment.id + 1,
                             trend=new_segment.trend,
-                            left_mc_id=new_segment.left_candle.id,
-                            right_mc_id=new_segment.right_candle.id,
+                            left_mc_id=new_segment.left_merged_id,
+                            right_mc_id=new_segment.right_merged_id,
                             left_oc_id=new_segment.left_ordinary_id,
                             right_oc_id=new_segment.right_ordinary_id,
                             strokes=new_segment.stroke_id_list
@@ -1746,11 +1465,17 @@ class ChanTheory:
             low=low
         )
 
-        action = self.generate_merged_candle(ordinary_candle)
+        action = self.update_merged_candle(ordinary_candle)
 
         # 如果 不是 生成新的合并K线，返回。
         if action != Action.MergedCandleGenerated:
             return
+
+        # --------------------
+        # 关于 分型
+        # --------------------
+        if self.merged_candles_count > 0:
+            self.update_fractals_and_strokes()
 
         # --------------------
         # 关于 笔

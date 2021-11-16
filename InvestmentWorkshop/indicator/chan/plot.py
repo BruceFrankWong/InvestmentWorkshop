@@ -12,10 +12,10 @@ from matplotlib.collections import PatchCollection
 import mplfinance as mpf
 
 from .definition import (
-    MergedCandleList,
+    MergedCandle,
     FractalPattern,
-    FractalList,
-    SegmentList,
+    Fractal,
+    Segment,
 )
 
 
@@ -37,9 +37,9 @@ def get_plot_style():
 
 
 def plot_chan_theory(df_origin: pd.DataFrame,
-                     merged_candle_list: MergedCandleList,
-                     fractal_list: FractalList,
-                     segment_list: SegmentList,
+                     merged_candle_list: List[MergedCandle],
+                     fractal_list: List[Fractal],
+                     segment_list: List[Segment],
                      count: int,
                      title: str = '',
                      tight_layout: bool = True,
@@ -263,7 +263,7 @@ def plot_chan_theory(df_origin: pd.DataFrame,
     print('Plot done.')
 
 
-def plot_pure_merged_candle(merged_candle_list: MergedCandleList,
+def plot_pure_merged_candle(merged_candle_list: List[MergedCandle],
                             count: int):
     style = get_plot_style()
 

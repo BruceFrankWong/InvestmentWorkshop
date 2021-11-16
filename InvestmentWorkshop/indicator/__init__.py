@@ -10,15 +10,15 @@ from .ma import (
 from .pbx import pbx
 from .boll import boll
 from .chan import (
-    generate_merged_candles,
-    generate_fractals,
+    update_merged_candles,
+    update_fractals,
     generate_strokes,
     generate_segments,
     generate_isolation_lines,
     generate_stroke_pivots,
     generate_segment_pivots,
 
-    ChanTheory,
+    ChanTheoryDynamic,
 
     plot_chan_theory,
 )

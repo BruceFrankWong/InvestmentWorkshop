@@ -15,16 +15,10 @@ from .definition import (
     Segment,
     IsolationLine,
     Pivot,
-
-    OrdinaryCandleList,
-    MergedCandleList,
-    FractalList,
-    StrokeList,
-    SegmentList,
 )
 from .static import (
-    generate_merged_candles,
-    generate_fractals,
+    update_merged_candles,
+    update_fractals,
     generate_strokes,
     generate_segments,
     generate_isolation_lines,
@@ -32,7 +26,7 @@ from .static import (
     generate_segment_pivots,
 )
 from .dynamic import (
-    ChanTheory
+    ChanTheoryDynamic
 )
 from .plot import (
     plot_chan_theory,
