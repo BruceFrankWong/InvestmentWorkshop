@@ -12,10 +12,13 @@ LOG_CANDLE_UPDATED: str = '\n  ● 合并K线：\n    第 {id} 根合并K线，'
                           'high = {high}，low = {low}。'
 
 LOG_FRACTAL_GENERATED: str = '\n  ● 生成分型：\n    第 {id} 个分型，模式 = {pattern}，' \
-                             '位置id（合并K线）= {merged_id}，位置id（普通K线）= {ordinary_id}。'
+                             '位置id（合并K线）= {mc_id}，位置id（普通K线）= {oc_id}。'
 
-LOG_FRACTAL_DROPPED: str = '\n  ● 丢弃分型：\n    当前合并K线的 {extreme_type}({price}) 达到或超越了' \
+LOG_FRACTAL_DROPPED: str = '\n  ● 丢弃分型：\n    当前合并K线 达到或超越了' \
                            '第 {id} 个分型（{pattern}）的极值（{extreme_price}），丢弃该分型。'
+
+LOG_FRACTAL_UPDATED: str = '\n  ● 修正分型：\n    当前合并K线 达到或超越了' \
+                           '第 {id} 个分型（{pattern}）的极值（{extreme_price}），修正该分型。'
 
 LOG_STROKE_GENERATED: str = '\n  ● 生成笔：\n    第 {id} 个笔，趋势 = {trend}，' \
                             '起点id（合并K线 ）= {left_mc_id}，终点id（合并K线）= {right_mc_id}，' \
