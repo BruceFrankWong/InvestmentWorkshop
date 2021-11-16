@@ -309,17 +309,8 @@ def update_fractals(
 
             if is_dropped:
                 if log:
-                    if last_fractal.pattern == FractalPattern.Top:
-                        extreme_type = '最高价'
-                        price = last_merged_candle.high
-                    else:
-                        extreme_type = '最低价'
-                        price = last_merged_candle.low
-
                     print(
                         LOG_FRACTAL_DROPPED.format(
-                            extreme_type=extreme_type,
-                            price=price,
                             id=last_fractal.id,
                             pattern=last_fractal.pattern,
                             extreme_price=last_fractal.extreme_price
