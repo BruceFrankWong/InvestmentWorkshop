@@ -8,7 +8,6 @@ from typing import List, Tuple, Optional
 from .definition import (
     FirstOrLast,
     FractalPattern,
-    FractalPotential,
     Trend,
 
     OrdinaryCandle,
@@ -100,58 +99,61 @@ def is_regular_fractal(
 
 
 def is_potential_fractal(
-        at: FirstOrLast,
-        merged_candles: List[MergedCandle]
-) -> Tuple[bool, Optional[FractalPattern], Optional[FractalPotential]]:
+        candles: List[MergedCandle],
+        at: FirstOrLast
+) -> Tuple[bool, Optional[FractalPattern]]:
     """
+    Determine the potential fractal.
 
+    :param candles:
     :param at:
-    :param merged_candles:
     :return:
     """
-    # 如果 First:
-    # 需要3根K线才判断是否可以生成潜在分型。
-    if at == FirstOrLast.First:
-        if len(merged_candles) >= 3:
-            left_candle: MergedCandle = merged_candles[-3]
-            middle_candle: MergedCandle = merged_candles[-2]
-            right_candle: MergedCandle = merged_candles[-1]
+    length: int = len(candles)
 
-            # 如果：
-            #     左侧K线的最高价 > 中间K线的最高价 > 右侧K线的最高价：
-            # 顶分型，潜在的。
-            if left_candle.high > middle_candle.high > right_candle.high:
-                return True, FractalPattern.Top, FractalPotential.Left
+    # 如果列表长度 < 2，返回 (False, None)。
+    if length < 2:
+        return False, None
 
-            # 如果：
-            #     左侧K线的最低价 < 中间K线的最低价 < 右侧K线的最低价：
-            # 顶分型，潜在的。
-            elif left_candle.low < middle_candle.low < right_candle.low:
-                return True, FractalPattern.Bottom, FractalPotential.Left
+    # 如果列表中合并K线的id不是紧挨着的，返回 (False, None)。
+    for i in range(length - 1):
+        if candles[i + 1].id - candles[i].id != 1:
+            return False, None
 
+    # 如果列表长度 < 2，返回 (False, None)。
+    if length == 2:
+        if candles[1].high > candles[0].high:
+            if at == FirstOrLast.Last:
+                return True, FractalPattern.Top
+            else:
+                return True, FractalPattern.Bottom
         else:
-            return False, None, None
+            if at == FirstOrLast.Last:
+                return True, FractalPattern.Bottom
+            else:
+                return True, FractalPattern.Top
 
-    # 如果 Last:
-    # 需要2根K线才判断是否可以生成潜在分型。
+    # 由开头两个合并K线获得序列方向。
+    is_increasing: bool = True if candles[1].high > candles[0].high else False
+
+    for i in range(2, length):
+        if is_increasing:
+            if candles[i].high < candles[i - 1].high:
+                return False, None
+        else:
+            if candles[i].high > candles[i - 1].high:
+                return False, None
+
+    if is_increasing:
+        if at == FirstOrLast.Last:
+            return True, FractalPattern.Top
+        else:
+            return True, FractalPattern.Bottom
     else:
-        left_candle: MergedCandle = merged_candles[-2]
-        right_candle: MergedCandle = merged_candles[-1]
-        # 如果 ：
-        #     右侧K线的最高价比左侧K线的最高价高：
-        # 顶分型。
-        if right_candle.high > left_candle.high:
-            return True, FractalPattern.Top, FractalPotential.Right
-
-        # 如果：
-        #     中间K线的最低价比左右K线的最低价都低：
-        # 底分型。
-        elif right_candle.low < left_candle.low:
-            return True, FractalPattern.Bottom, FractalPotential.Right
-
-        # 其它：不是分型。
+        if at == FirstOrLast.Last:
+            return True, FractalPattern.Bottom
         else:
-            return False, None, None
+            return True, FractalPattern.Top
 
 
 def is_overlap(
