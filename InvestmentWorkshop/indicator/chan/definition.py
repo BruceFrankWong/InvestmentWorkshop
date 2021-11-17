@@ -375,6 +375,11 @@ class ChanTheory:
 
     @property
     def minimum_distance(self) -> int:
+        """
+        The minimum distance between two fractals. And it also is the minimum length of strokes.
+
+        :return: int.
+        """
         return self._minimum_distance
 
     @property
