@@ -38,6 +38,15 @@ class Action(Enum):
         return self.value
 
 
+class LogLevel(Enum):
+    Simple = '简单'
+    Normal = '普通'
+    Detailed = '详细'
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class FirstOrLast(Enum):
     First = 'First'
     Last = 'Last'
