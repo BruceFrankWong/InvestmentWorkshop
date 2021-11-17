@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from enum import Enum
 from copy import deepcopy
 from dataclasses import dataclass
@@ -372,6 +372,10 @@ class ChanTheory:
         self._isolation_lines = []
         self._stroke_pivots = []
         self._segment_pivots = []
+
+    @property
+    def minimum_distance(self) -> int:
+        return self._minimum_distance
 
     @property
     def merged_candles_count(self) -> int:
