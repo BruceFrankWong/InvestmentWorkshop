@@ -39,6 +39,7 @@ class Action(Enum):
 
 
 class LogLevel(Enum):
+    Off = '关闭'
     Simple = '简单'
     Normal = '普通'
     Detailed = '详细'
