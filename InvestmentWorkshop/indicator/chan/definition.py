@@ -39,13 +39,20 @@ class Action(Enum):
 
 
 class LogLevel(Enum):
-    Off = '关闭'
-    Simple = '简单'
-    Normal = '普通'
-    Detailed = '详细'
+    Off = 0
+    Simple = 1
+    Normal = 2
+    Detailed = 3
 
     def __str__(self) -> str:
-        return self.value
+        if self.value == 0:
+            return '关闭'
+        elif self.value == 1:
+            return '简单'
+        elif self.value == 2:
+            return '普通'
+        else:
+            return '详细'
 
 
 class FirstOrLast(Enum):
