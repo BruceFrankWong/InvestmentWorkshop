@@ -118,36 +118,36 @@ def read_dce_history_data_xls(xls_path: Path) -> List[QuoteDaily]:
     for data_sheet in workbook.sheets():
 
         # Columns.
-        xls_column_list: List[str] = [x.value for x in data_sheet.row(0)]
+        xls_column_list: List[str] = [x._value for x in data_sheet.row(0)]
         for i in range(1, data_sheet.nrows):
             row = data_sheet.row(i)
-            date_str = row[xls_column_list.index('交易日期')].value
+            date_str = row[xls_column_list.index('交易日期')]._value
             if date_str is None:
                 print(f'Error in {xls_path} at row {i}')
             result.append(
                 {
                     'exchange': 'DCE',
-                    'symbol': row[xls_column_list.index('合约名称')].value,
+                    'symbol': row[xls_column_list.index('合约名称')]._value,
                     'date': dt.date(
                         year=int(date_str[:4]),
                         month=int(date_str[4:6]),
                         day=int(date_str[6:8])
                     ),
-                    'open': float(row[xls_column_list.index('开盘价')].value),
-                    'high': float(row[xls_column_list.index('最高价')].value),
-                    'low': float(row[xls_column_list.index('最低价')].value),
-                    'close': float(row[xls_column_list.index('收盘价')].value),
-                    'previous_settlement': float(row[xls_column_list.index('前结算价')].value),
-                    'settlement': float(row[xls_column_list.index('结算价')].value),
-                    'change_on_close': float(row[xls_column_list.index('涨跌')].value),
-                    'change_on_settlement': float(row[xls_column_list.index('涨跌1')].value),
-                    'delta': float(row[xls_column_list.index('DELTA')].value)
-                    if row[xls_column_list.index('DELTA')].value != '' else None,
-                    'volume': int(row[xls_column_list.index('成交量')].value),
-                    'open_interest': int(row[xls_column_list.index('持仓量')].value),
-                    'change_on_open_interest': int(row[xls_column_list.index('持仓量变化')].value),
-                    'amount': float(row[xls_column_list.index('成交额（万元）')].value) * 10000,
-                    'exercise': int(row[xls_column_list.index('行权量')].value),
+                    'open': float(row[xls_column_list.index('开盘价')]._value),
+                    'high': float(row[xls_column_list.index('最高价')]._value),
+                    'low': float(row[xls_column_list.index('最低价')]._value),
+                    'close': float(row[xls_column_list.index('收盘价')]._value),
+                    'previous_settlement': float(row[xls_column_list.index('前结算价')]._value),
+                    'settlement': float(row[xls_column_list.index('结算价')]._value),
+                    'change_on_close': float(row[xls_column_list.index('涨跌')]._value),
+                    'change_on_settlement': float(row[xls_column_list.index('涨跌1')]._value),
+                    'delta': float(row[xls_column_list.index('DELTA')]._value)
+                    if row[xls_column_list.index('DELTA')]._value != '' else None,
+                    'volume': int(row[xls_column_list.index('成交量')]._value),
+                    'open_interest': int(row[xls_column_list.index('持仓量')]._value),
+                    'change_on_open_interest': int(row[xls_column_list.index('持仓量变化')]._value),
+                    'amount': float(row[xls_column_list.index('成交额（万元）')]._value) * 10000,
+                    'exercise': int(row[xls_column_list.index('行权量')]._value),
                 }
             )
 
@@ -167,7 +167,7 @@ def read_dce_history_data_xlsx(xlsx_path: Path) -> List[QuoteDaily]:
     column_max: str
     row_max: int
     column_max, row_max = coordinate_from_string(worksheet.dimensions.split(':')[1])
-    column_list: List[str] = [str(x.value).strip() for x in list(worksheet.rows)[0]]
+    column_list: List[str] = [str(x._value).strip() for x in list(worksheet.rows)[0]]
     for row in range(2, row_max):
         if '交易日期' in column_list:
             day = worksheet.cell(row=row, column=column_list.index('交易日期') + 1).value

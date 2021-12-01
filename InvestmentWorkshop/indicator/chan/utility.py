@@ -69,11 +69,10 @@ def is_inclusive_candle(candle_1: OrdinaryCandle,
     )
 
 
-def is_regular_fractal(
-        left_candle: MergedCandle,
-        middle_candle: MergedCandle,
-        right_candle: MergedCandle
-) -> Tuple[bool, Optional[FractalPattern]]:
+def is_regular_fractal(left_candle: MergedCandle,
+                       middle_candle: MergedCandle,
+                       right_candle: MergedCandle
+                       ) -> Optional[FractalPattern]:
     """
 
     :param left_candle:
@@ -85,15 +84,37 @@ def is_regular_fractal(
     #     中间K线的最高价比左右K线的最高价都高：
     # 顶分型。
     if middle_candle.high > left_candle.high and middle_candle.high > right_candle.high:
-        return True, FractalPattern.Top
+        return FractalPattern.Top
 
     # 如果：
     #     中间K线的最低价比左右K线的最低价都低：
     # 底分型。
     elif middle_candle.low < left_candle.low and middle_candle.low < right_candle.low:
-        return True, FractalPattern.Bottom
+        return FractalPattern.Bottom
 
     # 其它：不是分型。
+    else:
+        return None
+
+
+def is_left_potential_fractal(left_candle: MergedCandle,
+                              right_candle: MergedCandle
+                              ) -> Tuple[bool, Optional[FractalPattern]]:
+    if left_candle.high > right_candle.high and left_candle.low > right_candle.low:
+        return True, FractalPattern.Top
+    elif left_candle.high < right_candle.high and left_candle.low < right_candle.low:
+        return True, FractalPattern.Bottom
+    else:
+        return False, None
+
+
+def is_right_potential_fractal(left_candle: MergedCandle,
+                               right_candle: MergedCandle
+                               ) -> Tuple[bool, Optional[FractalPattern]]:
+    if right_candle.high > left_candle.high and right_candle.low > left_candle.low:
+        return True, FractalPattern.Top
+    elif right_candle.high < left_candle.high and right_candle.low < left_candle.low:
+        return True, FractalPattern.Bottom
     else:
         return False, None
 
@@ -263,3 +284,162 @@ def get_fractal_distance(
     """
     return get_merged_candle_idx(right_fractal.middle_candle, merged_candle_list) - \
         get_merged_candle_idx(left_fractal.middle_candle, merged_candle_list)
+
+
+def generate_merged_candle(ordinary_candle: OrdinaryCandle,
+                           last_candle: Tuple[Optional[MergedCandle], Optional[MergedCandle]]
+                           ) -> MergedCandle:
+    """
+    Generate a new merged candle or crop with existed merged candle.
+
+    :param ordinary_candle:  
+    :param last_candle: 
+    :return: 
+    """
+    left_candle: Optional[MergedCandle]
+    right_candle: Optional[MergedCandle]
+    
+    left_candle, right_candle = last_candle
+    
+    # 如果 left_candle 和 right_candle 都是 None，直接将 ordinary_candle 作为新的合并K线。
+    if left_candle is None and right_candle is None:
+        new_merged_candle: MergedCandle = MergedCandle(
+            id=0,
+            high=ordinary_candle.high,
+            low=ordinary_candle.low,
+            period=1,
+            left_ordinary_id=0
+        )
+
+        return new_merged_candle
+
+    # 如果 left_candle 和 right_candle 中有一个是 None：
+    if right_candle is None and left_candle is not None:
+        right_candle, left_candle = left_candle, right_candle
+    
+    # 如果没有包含关系，直接将 ordinary_candle 作为新的合并K线。
+    if not is_inclusive_candle(right_candle, ordinary_candle):
+        new_merged_candle: MergedCandle = MergedCandle(
+            id=right_candle.id + 1,
+            high=ordinary_candle.high,
+            low=ordinary_candle.low,
+            period=1,
+            left_ordinary_id=right_candle.right_ordinary_id + 1
+        )
+
+        return new_merged_candle
+    
+    # 有包含关系：
+    else:
+        # last_candle 长度为 1，取前合并K线和新普通K线的最大范围。
+        if left_candle is None:
+            right_candle.high = max(
+                right_candle.high,
+                ordinary_candle.high
+            )
+            right_candle.low = min(
+                right_candle.low,
+                ordinary_candle.low
+            )
+            right_candle.period += 1
+
+            return right_candle
+        
+        else:
+            if left_candle.id > right_candle.id:
+                left_candle, right_candle = right_candle, left_candle
+            
+            if left_candle.id == right_candle.id:
+                raise ValueError('变量 <last_candle> 中的两个合并K线的 id 相同。')
+            if right_candle.id - left_candle.id != 1:
+                raise ValueError('变量 <last_candle> 中的两个合并K线的 id 序号相差超过 1。')
+            
+            if right_candle.high > left_candle.high and \
+                    right_candle.low > left_candle.low:
+                right_candle.high = max(
+                    right_candle.high,
+                    ordinary_candle.high
+                )
+                right_candle.low = max(
+                    right_candle.low,
+                    ordinary_candle.low
+                )
+                right_candle.period += 1
+
+                return right_candle
+
+            elif right_candle.high < left_candle.high and \
+                    right_candle.low < left_candle.low:
+                right_candle.high = min(
+                    right_candle.high,
+                    ordinary_candle.high
+                )
+                right_candle.low = min(
+                    right_candle.low,
+                    ordinary_candle.low
+                )
+                right_candle.period += 1
+
+                return right_candle
+
+            else:
+                raise ValueError(
+                    f'两个合并K线（id: {left_candle.id}, {right_candle.id}）的高低关系出错。'
+                )
+
+
+def generate_fractal(left_candle: MergedCandle,
+                     middle_candle: MergedCandle,
+                     right_candle: MergedCandle,
+                     last_fractal: Optional[Fractal],
+                     strict_mode: bool = True
+                     ) -> Optional[Fractal]:
+    """
+    Generate fractal.
+
+    :param left_candle:
+    :param middle_candle:
+    :param right_candle:
+    :param last_fractal:
+    :param strict_mode:
+    :return:
+    """
+    minimum_distance: int = 4 if strict_mode else 3
+
+    # 判定分型。
+    pattern: FractalPattern
+    if middle_candle.high > left_candle.high and \
+            middle_candle.high > right_candle.high:
+        pattern = FractalPattern.Top
+
+    elif middle_candle.low < left_candle.low and \
+            middle_candle.low < right_candle.low:
+        pattern = FractalPattern.Bottom
+
+    elif left_candle.high < middle_candle.high < right_candle.high:
+        return None
+
+    elif left_candle.high > middle_candle.high > right_candle.high:
+        return None
+
+    else:
+        raise RuntimeError('【ERROR】')
+
+    if last_fractal is not None:
+        # 判定模式。
+        if pattern == last_fractal.pattern:
+            return None
+
+        # 判定距离。
+        distance = middle_candle.id - last_fractal.merged_id
+        if distance < minimum_distance:
+            return None
+
+    return Fractal(
+        id=0 if last_fractal is None else last_fractal.id + 1,
+        pattern=pattern,
+        left_candle=left_candle,
+        middle_candle=middle_candle,
+        right_candle=right_candle,
+        is_confirmed=False
+    )

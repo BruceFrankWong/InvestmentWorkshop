@@ -128,7 +128,7 @@ def read_shfe_history_data(xls_file: Path) -> Tuple[List[Dict[str, Any]], List[D
     workbook = xlrd.open_workbook(xls_file)
     data_sheet = workbook.sheet_by_index(0)
 
-    xls_column_list: List[str] = [x.value for x in data_sheet.row(2)]
+    xls_column_list: List[str] = [x._value for x in data_sheet.row(2)]
     mapper: Dict[str, int] = {
         'symbol': xls_column_list.index('合约'),
         'date': xls_column_list.index('日期'),
@@ -150,10 +150,10 @@ def read_shfe_history_data(xls_file: Path) -> Tuple[List[Dict[str, Any]], List[D
     last_symbol: str = ''
     for i in range(3, data_sheet.nrows - 5):
         row = data_sheet.row(i)
-        if row[mapper['date']].value == 'Date':
+        if row[mapper['date']]._value == 'Date':
             continue
         if row[mapper['symbol']].ctype != 0:
-            last_symbol = row[mapper['symbol']].value
+            last_symbol = row[mapper['symbol']]._value
 
         if len(last_symbol) <= 6:
             symbol_dict = split_symbol(last_symbol, SHFE_PATTERN_FUTURES)
@@ -164,35 +164,35 @@ def read_shfe_history_data(xls_file: Path) -> Tuple[List[Dict[str, Any]], List[D
                     'product': symbol_dict[0],
                     'expiration': symbol_dict[1],
                     'date': dt.date(
-                        year=int(row[mapper['date']].value[:4]),
-                        month=int(row[mapper['date']].value[4:6]),
-                        day=int(row[mapper['date']].value[6:8])
+                        year=int(row[mapper['date']]._value[:4]),
+                        month=int(row[mapper['date']]._value[4:6]),
+                        day=int(row[mapper['date']]._value[6:8])
                     ),
 
-                    'previous_close': row[mapper['previous_close']].value
+                    'previous_close': row[mapper['previous_close']]._value
                     if row[mapper['settlement']].ctype != 0 else None,
 
-                    'previous_settlement': row[mapper['previous_settlement']].value
+                    'previous_settlement': row[mapper['previous_settlement']]._value
                     if row[mapper['settlement']].ctype != 0 else None,
 
-                    'open': row[mapper['open']].value if row[mapper['open']].ctype != 0 else None,
-                    'high': row[mapper['high']].value if row[mapper['high']].ctype != 0 else None,
-                    'low': row[mapper['low']].value if row[mapper['low']].ctype != 0 else None,
-                    'close': row[mapper['close']].value if row[mapper['close']].ctype != 0 else None,
-                    'settlement': row[mapper['settlement']].value if row[mapper['settlement']].ctype != 0 else None,
+                    'open': row[mapper['open']]._value if row[mapper['open']].ctype != 0 else None,
+                    'high': row[mapper['high']]._value if row[mapper['high']].ctype != 0 else None,
+                    'low': row[mapper['low']]._value if row[mapper['low']].ctype != 0 else None,
+                    'close': row[mapper['close']]._value if row[mapper['close']].ctype != 0 else None,
+                    'settlement': row[mapper['settlement']]._value if row[mapper['settlement']].ctype != 0 else None,
 
-                    'change_on_close': row[mapper['change_on_close']].value
+                    'change_on_close': row[mapper['change_on_close']]._value
                     if row[mapper['change_on_close']].ctype != 0 else None,
-                    'change_on_settlement': row[mapper['change_on_settlement']].value
+                    'change_on_settlement': row[mapper['change_on_settlement']]._value
                     if row[mapper['change_on_settlement']].ctype != 0 else None,
 
-                    'volume': int(row[mapper['volume']].value)
+                    'volume': int(row[mapper['volume']]._value)
                     if row[mapper['volume']].ctype != 0 else None,
 
-                    'amount': row[mapper['amount']].value
+                    'amount': row[mapper['amount']]._value
                     if row[mapper['amount']].ctype != 0 else None,
 
-                    'open_interest': int(row[mapper['open_interest']].value)
+                    'open_interest': int(row[mapper['open_interest']]._value)
                     if row[mapper['open_interest']].ctype != 0 else None,
                 }
             )
@@ -207,35 +207,35 @@ def read_shfe_history_data(xls_file: Path) -> Tuple[List[Dict[str, Any]], List[D
                     'offset': symbol_dict[2],
                     'exercise_price': symbol_dict[3],
                     'date': dt.date(
-                        year=int(row[mapper['date']].value[:4]),
-                        month=int(row[mapper['date']].value[4:6]),
-                        day=int(row[mapper['date']].value[6:8])
+                        year=int(row[mapper['date']]._value[:4]),
+                        month=int(row[mapper['date']]._value[4:6]),
+                        day=int(row[mapper['date']]._value[6:8])
                     ),
 
-                    'previous_close': row[mapper['previous_close']].value
+                    'previous_close': row[mapper['previous_close']]._value
                     if row[mapper['settlement']].ctype != 0 else None,
 
-                    'previous_settlement': row[mapper['previous_settlement']].value
+                    'previous_settlement': row[mapper['previous_settlement']]._value
                     if row[mapper['settlement']].ctype != 0 else None,
 
-                    'open': row[mapper['open']].value if row[mapper['open']].ctype != 0 else None,
-                    'high': row[mapper['high']].value if row[mapper['high']].ctype != 0 else None,
-                    'low': row[mapper['low']].value if row[mapper['low']].ctype != 0 else None,
-                    'close': row[mapper['close']].value if row[mapper['close']].ctype != 0 else None,
-                    'settlement': row[mapper['settlement']].value if row[mapper['settlement']].ctype != 0 else None,
+                    'open': row[mapper['open']]._value if row[mapper['open']].ctype != 0 else None,
+                    'high': row[mapper['high']]._value if row[mapper['high']].ctype != 0 else None,
+                    'low': row[mapper['low']]._value if row[mapper['low']].ctype != 0 else None,
+                    'close': row[mapper['close']]._value if row[mapper['close']].ctype != 0 else None,
+                    'settlement': row[mapper['settlement']]._value if row[mapper['settlement']].ctype != 0 else None,
 
-                    'change_on_close': row[mapper['change_on_close']].value
+                    'change_on_close': row[mapper['change_on_close']]._value
                     if row[mapper['change_on_close']].ctype != 0 else None,
-                    'change_on_settlement': row[mapper['change_on_settlement']].value
+                    'change_on_settlement': row[mapper['change_on_settlement']]._value
                     if row[mapper['change_on_settlement']].ctype != 0 else None,
 
-                    'volume': int(row[mapper['volume']].value)
+                    'volume': int(row[mapper['volume']]._value)
                     if row[mapper['volume']].ctype != 0 else None,
 
-                    'amount': row[mapper['amount']].value
+                    'amount': row[mapper['amount']]._value
                     if row[mapper['amount']].ctype != 0 else None,
 
-                    'open_interest': int(row[mapper['open_interest']].value)
+                    'open_interest': int(row[mapper['open_interest']]._value)
                     if row[mapper['open_interest']].ctype != 0 else None,
                 }
             )

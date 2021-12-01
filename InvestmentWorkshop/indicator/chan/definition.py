@@ -3,7 +3,7 @@
 __author__ = 'Bruce Frank Wong'
 
 
-from typing import List, Optional
+from typing import List, Optional, Any
 from enum import Enum
 from copy import deepcopy
 from dataclasses import dataclass
@@ -55,9 +55,21 @@ class LogLevel(Enum):
             return '详细'
 
 
+class RelationshipInNumbers(Enum):
+    Equal = '等于'
+    Greater = '大于'
+    Less = '小于'
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class FirstOrLast(Enum):
-    First = 'First'
-    Last = 'Last'
+    First = '开始/左侧'
+    Last = '结束/右侧'
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class FractalPattern(Enum):
@@ -363,9 +375,96 @@ class Pivot:
                f'right ordinary idx = {self.right_ordinary_id})'
 
 
+@dataclass
+class PeriodUnit:
+    name_zh: str
+    name_en: str
+
+
+class PeriodUnitEnum(Enum):
+    Year = PeriodUnit(name_zh='年', name_en='Year')
+    Quarter = PeriodUnit(name_zh='季', name_en='Quarter')
+    Month = PeriodUnit(name_zh='月', name_en='Month')
+    Week = PeriodUnit(name_zh='周', name_en='Week')
+    Day = PeriodUnit(name_zh='日', name_en='Day')
+    Hour = PeriodUnit(name_zh='小时', name_en='Hour')
+    Minute = PeriodUnit(name_zh='分钟', name_en='Minute')
+    Second = PeriodUnit(name_zh='秒', name_en='Second')
+
+    @property
+    def name_en(self) -> str:
+        return self.value.name_en
+
+    @property
+    def name_zh(self) -> str:
+        return self.value.name_zh
+
+
+class Period:
+    _value: int
+    _unit: PeriodUnitEnum
+    _upper: Any
+    _lower: Any
+
+    def __init__(self,
+                 value: int,
+                 unit: PeriodUnitEnum
+                 ) -> None:
+        self._value = value
+        self._unit = unit
+        self._lower = None
+        self._upper = None
+
+    @property
+    def upper(self):
+        return self._upper
+
+    @upper.setter
+    def upper(self, p):
+        self._upper = p
+
+    @property
+    def lower(self):
+        return self._lower
+
+    @lower.setter
+    def lower(self, p):
+        self._lower = p
+
+    @property
+    def name_en(self) -> str:
+        return f'{self._value}{self._unit.name_en}'
+
+    @property
+    def name_zh(self) -> str:
+        return f'{self._value}{self._unit.name_zh}'
+
+
+Period5S = Period(value=5, unit=PeriodUnitEnum.Second)
+Period30S = Period(value=30, unit=PeriodUnitEnum.Second)
+Period3M = Period(value=3, unit=PeriodUnitEnum.Minute)
+Period15M = Period(value=15, unit=PeriodUnitEnum.Minute)
+Period1H = Period(value=1, unit=PeriodUnitEnum.Hour)
+Period1D = Period(value=1, unit=PeriodUnitEnum.Day)
+
+Period1D.upper = None
+Period1D.lower = Period1H
+
+Period1H.upper = Period1D
+Period1H.lower = Period15M
+
+Period15M.upper = Period1H
+Period15M.lower = Period3M
+
+Period3M.upper = Period15M
+Period3M.lower = Period30S
+
+Period30S.upper = Period3M
+Period30S.lower = None
+
+
 class ChanTheory:
-    _strict_mode: bool
-    _minimum_distance: int
+
     _merged_candles: List[MergedCandle]
     _fractals: List[Fractal]
     _strokes: List[Stroke]
@@ -374,14 +473,20 @@ class ChanTheory:
     _stroke_pivots: List[Pivot]
     _segment_pivots: List[Pivot]
 
-    def __init__(self, strict_mode: bool = True):
+    _strict_mode: bool
+    _minimum_distance: int
+
+    _log_level: LogLevel
+
+    def __init__(self,
+                 strict_mode: bool = True,
+                 log_level: LogLevel = LogLevel.Normal
+                 ):
         """
         Initialize the object.
 
         :param strict_mode:
         """
-        self._strict_mode = strict_mode
-        self._minimum_distance = 4 if strict_mode else 3
         self._merged_candles = []
         self._fractals = []
         self._strokes = []
@@ -389,6 +494,11 @@ class ChanTheory:
         self._isolation_lines = []
         self._stroke_pivots = []
         self._segment_pivots = []
+
+        self._strict_mode = strict_mode
+        self._minimum_distance = 4 if strict_mode else 3
+
+        self._log_level = log_level
 
     @property
     def minimum_distance(self) -> int:
@@ -524,3 +634,23 @@ class ChanTheory:
         :return:
         """
         return deepcopy(self._segment_pivots)
+
+    @staticmethod
+    def is_inclusive(left_candle: OrdinaryCandle,
+                     right_candle: OrdinaryCandle
+                     ) -> bool:
+        """
+        判断两根K线是否存在包含关系。两根K线的关系有以下九种：
+
+        :param left_candle: OrdinaryCandle, candlestick 1.
+        :param right_candle: OrdinaryCandle, candlestick 2.
+
+        ----
+        :return: bool. Return True if a candle include another, otherwise False.
+        """
+
+        if (left_candle.high > right_candle.high and left_candle.low > right_candle.low) or \
+                (left_candle.high < right_candle.high and left_candle.low < right_candle.low):
+            return False
+        else:
+            return True

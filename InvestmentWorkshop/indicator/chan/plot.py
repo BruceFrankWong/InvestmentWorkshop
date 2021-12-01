@@ -15,7 +15,9 @@ from .definition import (
     MergedCandle,
     FractalPattern,
     Fractal,
+    Stroke,
     Segment,
+    ChanTheory
 )
 
 
@@ -36,15 +38,13 @@ def get_plot_style():
     return mpf_style
 
 
-def plot_chan_theory(df_origin: pd.DataFrame,
-                     merged_candle_list: List[MergedCandle],
-                     fractal_list: List[Fractal],
-                     segment_list: List[Segment],
+def plot_chan_theory(df: pd.DataFrame,
+                     chan: ChanTheory,
                      count: int,
                      title: str = '',
-                     tight_layout: bool = True,
-                     show_ordinary_idx: bool = False,
-                     show_chan_idx: bool = False,
+                     tight_layout: bool = False,
+                     show_ordinary_id: bool = False,
+                     show_merged_id: bool = False,
                      merged_candle_edge_width: int = 3,
                      show_all_merged: bool = False,
                      hatch_merged: bool = False,
@@ -54,15 +54,13 @@ def plot_chan_theory(df_origin: pd.DataFrame,
     """
     绘制合并后的K线。
 
-    :param df_origin:
-    :param merged_candle_list:
-    :param fractal_list:
-    :param segment_list:
+    :param df:
+    :param chan:
     :param count:
     :param title:
     :param tight_layout:
-    :param show_ordinary_idx:
-    :param show_chan_idx:
+    :param show_ordinary_id:
+    :param show_merged_id:
     :param merged_candle_edge_width:
     :param show_all_merged:
     :param hatch_merged:
@@ -73,31 +71,26 @@ def plot_chan_theory(df_origin: pd.DataFrame,
     ----
     :return:
     """
-    print(f'df_origin: {len(df_origin)}')
-    print(f'merged_candle_list: {len(merged_candle_list)}')
-    print(f'fractal_list: {len(fractal_list)}')
 
     style = get_plot_style()
+
+    # 最大日期
+    max_date = df.index[count]
+    print(max_date)
 
     # 附加元素
     additional_plot: list = []
 
     # 分型 和 笔
+    fractal: Fractal
     fractal_t: list = []
     fractal_b: list = []
     idx_fractal_to_ordinary: int
     idx_ordinary_candle: int = 0
-    stroke: List[Tuple[str, float]] = []  # 笔
 
-    for i in range(len(fractal_list)):
-        fractal = fractal_list[i]
+    for i in range(chan.fractals_count):
+        fractal = chan.fractals[i]
 
-        stroke.append(
-            (
-                df_origin.index[fractal.ordinary_id],
-                fractal.extreme_price
-            )
-        )
         for j in range(idx_ordinary_candle, fractal.ordinary_id):
             fractal_t.append(np.nan)
             fractal_b.append(np.nan)
@@ -119,37 +112,63 @@ def plot_chan_theory(df_origin: pd.DataFrame,
         mpf.make_addplot(fractal_b, type='scatter', markersize=fractal_marker_size, marker='^')
     )
 
-    # 线段
-    plot_segment: List[Tuple[str, float]] = []  # 线段
+    # 笔
+    plot_stroke: List[Tuple[str, float]] = []
+    stroke: Stroke
+    if chan.strokes_count > 0:
 
-    for i in range(len(segment_list)):
-        segment = segment_list[i]
-        fractal = segment.left_fractal
-
-        plot_segment.append(
-            (
-                df_origin.index[fractal.ordinary_id],
-                fractal.extreme_price
+        for stroke in chan.strokes:
+            if df.index[stroke.left_ordinary_id] > max_date:
+                break
+            plot_stroke.append(
+                (
+                    df.index[stroke.left_ordinary_id],
+                    stroke.left_price
+                )
             )
-        )
-    plot_segment.append(
-        (
-            df_origin.index[segment_list[-1].right_fractal.ordinary_id],
-            segment_list[-1].right_fractal.extreme_price
-        )
-    )
+            # print(stroke.id, stroke.left_candle)
+        # plot_stroke.append(
+        #     (
+        #         df.index[chan.strokes[-1].right_ordinary_id],
+        #         chan.strokes[-1].right_price
+        #     )
+        # )
+
+    # 线段
+    segment: Segment
+    plot_segment: List[Tuple[str, float]] = []
+    # if chan.segments_count > 0:
+    #     for segment in chan.segments:
+    #         if df.index[segment.left_ordinary_id] >= max_date:
+    #             break
+    #         plot_segment.append(
+    #             (
+    #                 df.index[segment.left_ordinary_id],
+    #                 segment.left_price
+    #             )
+    #         )
+    #     # plot_segment.append(
+    #     #     (
+    #     #         df.index[chan.segments[-1].right_ordinary_id],
+    #     #         chan.segments[-1].right_price
+    #     #     )
+    #     # )
+
+    # 线
+    al = plot_stroke if len(plot_segment) == 0 else [plot_stroke, plot_segment]
+    co = 'k' if len(plot_segment) == 0 else ['k', 'r']
 
     # mplfinance 的配置
     mpf_config = {}
 
     fig, ax_list = mpf.plot(
-        df_origin.iloc[:count],
+        df.iloc[:count],
         title=title,
         type='candle',
         volume=False,
         addplot=additional_plot,
-        alines=dict(alines=[stroke, plot_segment],
-                    colors=['k', 'r'],
+        alines=dict(alines=al,
+                    colors=co,
                     linestyle='--',
                     linewidths=0.05
                     ),
@@ -171,17 +190,19 @@ def plot_chan_theory(df_origin: pd.DataFrame,
         for k, v in mpf_config.items():
             print(k, v)
 
-    # 生成缠论K线元素。
-    candle_chan = []
-    for idx in range(len(merged_candle_list)):
-        candle = merged_candle_list[idx]
+    # 额外的元素。
+    patches = []
+
+    # 生成合并K线元素。
+    for idx in range(chan.merged_candles_count):
+        candle = chan.merged_candles[idx]
 
         if candle.left_ordinary_id > count:
             break
 
         if not show_all_merged and candle.period == 1:
             continue
-        candle_chan.append(
+        patches.append(
             Rectangle(
                 xy=(
                     candle.left_ordinary_id - candle_width / 2,
@@ -190,38 +211,31 @@ def plot_chan_theory(df_origin: pd.DataFrame,
                 width=candle.period - 1 + candle_width,
                 height=candle.high - candle.low,
                 angle=0,
-                linewidth=line_width * merged_candle_edge_width
+                linewidth=line_width * merged_candle_edge_width,
+                edgecolor='black',
+                facecolor='gray' if hatch_merged else 'none',
             )
         )
 
-    # 生成矩形。
-    patch_collection: PatchCollection
-    if hatch_merged:
-        patch_collection = PatchCollection(
-            candle_chan,
-            edgecolor='black',
-            facecolor='gray',
-            alpha=0.35
-        )
-    else:
-        patch_collection = PatchCollection(
-            candle_chan,
-            edgecolor='black',
-            facecolor='none'
-        )
+    # 生成 patch。
+    patch_collection: PatchCollection = PatchCollection(
+        patches,
+        alpha=0.35
+    )
 
+    # 添加 patch 到 axis。
     ax1 = ax_list[0]
     ax1.add_collection(patch_collection)
 
     # 普通K线 idx
-    if show_ordinary_idx:
+    if show_ordinary_id:
         idx_ordinary_x: List[int] = []
         idx_ordinary_y: List[float] = []
         idx_ordinary_value: List[str] = []
 
         for idx in range(0, count, 5):
             idx_ordinary_x.append(idx - candle_width / 2)
-            idx_ordinary_y.append(df_origin.iloc[idx].at['low'] - 14)
+            idx_ordinary_y.append(df.iloc[idx].at['low'] - 14)
             idx_ordinary_value.append(str(idx))
 
         for idx in range(len(idx_ordinary_x)):
@@ -236,16 +250,16 @@ def plot_chan_theory(df_origin: pd.DataFrame,
             )
 
     # 缠论K线 idx
-    if show_chan_idx:
+    if show_merged_id:
         idx_chan_x: List[int] = []
         idx_chan_y: List[float] = []
         idx_chan_value: List[str] = []
 
-        for i in range(len(merged_candle_list)):
-            candle = merged_candle_list[i]
+        for i in range(chan.merged_candles_count):
+            candle = chan.merged_candles[i]
             idx_chan_x.append(candle.right_ordinary_id - candle_width / 2)
             idx_chan_y.append(candle.high + 14)
-            idx_chan_value.append(str(merged_candle_list.index(candle)))
+            idx_chan_value.append(str(chan.merged_candles.index(candle)))
 
         for i in range(len(idx_chan_x)):
             ax1.text(
