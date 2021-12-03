@@ -275,11 +275,28 @@ def log_try_to_generate_segment_pivot(log_level: LogLevel) -> None:
         print('\n  ○ 尝试生成段中枢：')
 
 
-def log_show_candles(log_level: LogLevel,
-                     left_candle: MergedCandle,
-                     middle_candle: MergedCandle,
-                     right_candle: MergedCandle
-                     ) -> None:
+def log_show_2_candles(log_level: LogLevel,
+                       left_candle: MergedCandle,
+                       right_candle: MergedCandle
+                       ) -> None:
+    if log_level.value >= LogLevel.Detailed.value:
+        print(
+            f'    左侧合并K线 id（合并K线）= {left_candle.id}，'
+            f'id（普通K线）= {left_candle.ordinary_id}，'
+            f'最高价 = {left_candle.high}，最低价 = {left_candle.low}'
+        )
+        print(
+            f'    右侧合并K线 id（合并K线）= {right_candle.id}，'
+            f'id（普通K线）= {right_candle.ordinary_id}，'
+            f'最高价 = {right_candle.high}，最低价 = {right_candle.low}'
+        )
+
+
+def log_show_3_candles(log_level: LogLevel,
+                       left_candle: MergedCandle,
+                       middle_candle: MergedCandle,
+                       right_candle: MergedCandle
+                       ) -> None:
     if log_level.value >= LogLevel.Detailed.value:
         print(
             f'\n    左侧合并K线 id（合并K线）= {left_candle.id}，'
@@ -295,10 +312,11 @@ def log_show_candles(log_level: LogLevel,
 
 
 def log_failed_in_not_enough_merged_candles(log_level: LogLevel,
-                                            count: int
+                                            count: int,
+                                            required: int
                                             ) -> None:
     if log_level.value >= LogLevel.Detailed.value:
-        print(f'\n    合并K线数量不足，仅有 {count} 个，至少需要 3 个。')
+        print(' ' * 4, f'合并K线数量不足，仅有 {count} 个，至少需要 {required} 个。')
 
 
 def log_passed_in_enough_distance(log_level: LogLevel,

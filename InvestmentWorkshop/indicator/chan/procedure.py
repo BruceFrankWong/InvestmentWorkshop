@@ -25,6 +25,8 @@ from .definition import (
     ChanTheory,
 )
 from .utility import (
+    is_fractal,
+    is_left_potential_fractal,
     is_right_potential_fractal,
     is_overlap,
     generate_merged_candle,
@@ -51,7 +53,8 @@ from .log_message import (
     log_try_to_generate_stroke,
     log_try_to_update_stroke,
 
-    log_show_candles,
+    log_show_2_candles,
+    log_show_3_candles,
 
     log_failed_in_not_enough_merged_candles,
 )
@@ -309,7 +312,11 @@ def generate_fractals(merged_candles: List[MergedCandle],
         log_try_to_generate_fractal(log_level=log_level)
 
         if idx < 3:
-            log_failed_in_not_enough_merged_candles(log_level=log_level, count=idx)
+            log_failed_in_not_enough_merged_candles(
+                log_level=log_level,
+                count=idx + 1,
+                required=3
+            )
             continue
 
         left_candle = merged_candles[idx - 2]
@@ -317,7 +324,7 @@ def generate_fractals(merged_candles: List[MergedCandle],
         right_candle = merged_candles[idx]
         last_fractal = fractals[-1] if len(fractals) > 0 else None
 
-        log_show_candles(
+        log_show_3_candles(
             log_level=log_level,
             left_candle=left_candle,
             middle_candle=middle_candle,
@@ -387,20 +394,41 @@ def generate_strokes(merged_candles: List[MergedCandle],
             # log
             log_try_to_generate_stroke(log_level=log_level)
 
-            if idx == 1:
-                log_failed_in_not_enough_merged_candles(log_level=log_level, count=idx)
+            # Required.
+            required: int = 5
+            if idx < required - 1:
+                log_failed_in_not_enough_merged_candles(
+                    log_level=log_level,
+                    count=idx + 1,
+                    required=required
+                )
                 continue
 
-            # Get the potential fractal (the last candle) pattern.
-            is_potential_fractal: bool
-            left_potential_fractal_pattern: FractalPattern
-            right_potential_fractal_pattern: FractalPattern
-            is_potential_fractal, right_potential_fractal_pattern = is_right_potential_fractal(
-                merged_candles[-2],
-                merged_candles[-1]
-            )
+            # Get the lower candle and higher candle.
+            lower_candle: MergedCandle = merged_candles[0]
+            higher_candle: MergedCandle = merged_candles[0]
+            current_candle: MergedCandle
             for i in range(1, idx):
-                pass
+                current_candle = merged_candles[i]
+
+                if current_candle.low < lower_candle.low:
+                    lower_candle = current_candle
+                if current_candle.high > higher_candle.high:
+                    higher_candle = current_candle
+
+            distance: int = max(higher_candle.id, lower_candle.id) - \
+                min(higher_candle.id, lower_candle.id)
+
+            if log_level.value >= LogLevel.Detailed.value:
+                print(
+                    f'    当前合并K线数量 = {idx + 1}。\n',
+                    f'    最低  low = {lower_candle.low}，',
+                    f'id：合并K线= {lower_candle.id}，普通K线= {lower_candle.ordinary_id}。\n',
+                    f'    最高 high = {higher_candle.high}，',
+                    f'id：合并K线= {higher_candle.id}，普通K线= {higher_candle.ordinary_id}。\n',
+                    f'    距离 = {distance}。'
+                )
+            continue
 
         # 如果 strokes 列表的长度 >= 1，尝试修正笔。
         if len(strokes) >= 1:

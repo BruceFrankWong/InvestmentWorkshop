@@ -97,26 +97,74 @@ def is_regular_fractal(left_candle: MergedCandle,
         return None
 
 
+def is_fractal(left_candle: Optional[MergedCandle],
+               middle_candle: MergedCandle,
+               right_candle: Optional[MergedCandle]
+               ) -> Optional[FractalPattern]:
+    """
+
+    :param left_candle:
+    :param middle_candle:
+    :param right_candle:
+    :return:
+    """
+
+    if left_candle is None and right_candle is None:
+        raise ValueError('<left_candle> and <right_candle> could not both be None.')
+
+    # Left potential fractal.
+    elif left_candle is None:
+        if middle_candle.high > right_candle.high and middle_candle.low > right_candle.low:
+            return FractalPattern.Top
+        elif middle_candle.high < right_candle.high and middle_candle.low < right_candle.low:
+            return FractalPattern.Bottom
+        else:
+            raise RuntimeError('Unexpected relationship in two merged candles.')
+
+    # Right potential fractal.
+    elif right_candle is None:
+        if middle_candle.high > left_candle.high and middle_candle.low > left_candle.low:
+            return FractalPattern.Top
+        elif middle_candle.high < left_candle.high and middle_candle.low < left_candle.low:
+            return FractalPattern.Bottom
+        else:
+            raise RuntimeError('Unexpected relationship in two merged candles.')
+
+    # Regular fractal.
+    else:
+        # 如果：中间K线的最高价比左右K线的最高价都高，顶分型。
+        if middle_candle.high > left_candle.high and middle_candle.high > right_candle.high:
+            return FractalPattern.Top
+
+        # 如果：中间K线的最低价比左右K线的最低价都低，底分型。
+        elif middle_candle.low < left_candle.low and middle_candle.low < right_candle.low:
+            return FractalPattern.Bottom
+
+        # 其它：不是分型。
+        else:
+            return None
+
+
 def is_left_potential_fractal(left_candle: MergedCandle,
                               right_candle: MergedCandle
-                              ) -> Tuple[bool, Optional[FractalPattern]]:
+                              ) -> FractalPattern:
     if left_candle.high > right_candle.high and left_candle.low > right_candle.low:
-        return True, FractalPattern.Top
+        return FractalPattern.Top
     elif left_candle.high < right_candle.high and left_candle.low < right_candle.low:
-        return True, FractalPattern.Bottom
+        return FractalPattern.Bottom
     else:
-        return False, None
+        raise RuntimeError('Unexpected relationship in two merged candles.')
 
 
 def is_right_potential_fractal(left_candle: MergedCandle,
                                right_candle: MergedCandle
-                               ) -> Tuple[bool, Optional[FractalPattern]]:
+                               ) -> FractalPattern:
     if right_candle.high > left_candle.high and right_candle.low > left_candle.low:
-        return True, FractalPattern.Top
+        return FractalPattern.Top
     elif right_candle.high < left_candle.high and right_candle.low < left_candle.low:
-        return True, FractalPattern.Bottom
+        return FractalPattern.Bottom
     else:
-        return False, None
+        raise RuntimeError('Unexpected relationship in two merged candles.')
 
 
 def is_potential_fractal(

@@ -46,7 +46,8 @@ from .log_message import (
     log_event_stroke_pivot_extended,
 
     log_try_to_generate_stroke,
-    log_show_candles,
+    log_show_2_candles,
+    log_show_3_candles,
 )
 from .utility import (
     is_regular_fractal,
@@ -216,9 +217,10 @@ class ChanTheoryDynamic(ChanTheory):
         # log trying.
         log_try_to_generate_stroke(log_level=log_level)
 
-        log_show_candles(
+        log_show_2_candles(
             log_level=log_level,
-            left_candle=
+            left_candle=self._merged_candles[0],
+            right_candle=self._merged_candles[1]
         )
         if log_level.value >= LogLevel.Detailed.value:
             print(
