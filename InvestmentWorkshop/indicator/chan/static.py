@@ -127,22 +127,14 @@ class ChanTheoryStatic(ChanTheory):
             if old_candle_right is None or new_candle.id != old_candle_right.id:
                 log_event_candle_generated(
                     log_level=log_level,
-                    element_id=new_candle.id + 1,
-                    left_oc_id=new_candle.left_ordinary_id,
-                    period=new_candle.period,
-                    high=new_candle.high,
-                    low=new_candle.low
+                    new_merged_candle=new_candle
                 )
 
                 self._merged_candles.append(new_candle)
             else:
                 log_event_candle_updated(
                     log_level=log_level,
-                    element_id=new_candle.id + 1,
-                    left_oc_id=new_candle.left_ordinary_id,
-                    period=new_candle.period,
-                    high=new_candle.high,
-                    low=new_candle.low
+                    merged_candle=new_candle
                 )
 
     def generate_fractals(self,
@@ -172,11 +164,15 @@ class ChanTheoryStatic(ChanTheory):
             # 第1个分型只需要保证中间合并K线的最高价/最低价是三个合并K线的极值即可。
             if self.fractals_count == 0:
 
+                # Log trying.
+                log_try_to_generate_fractal(log_level=log_level)
+
                 # 如果合并K线的数量少于3个，log 信息。
                 if self.merged_candles_count < 3:
                     log_failed_in_not_enough_merged_candles(
-                        log_level,
-                        self.merged_candles_count
+                        log_level=log_level,
+                        count=self.merged_candles_count,
+                        required=self.minimum_distance
                     )
                     continue
 
@@ -184,7 +180,11 @@ class ChanTheoryStatic(ChanTheory):
                 middle_candle = self._merged_candles[idx - 1]
                 right_candle = self._merged_candles[idx]
 
-                log_try_to_generate_fractal(log_level, left_candle, middle_candle, right_candle)
+
+                    # left_candle,
+                #     middle_candle,
+                #     right_candle
+                # )
 
                 new_fractal = is_regular_fractal(left_candle, middle_candle, right_candle)
 
@@ -197,14 +197,11 @@ class ChanTheoryStatic(ChanTheory):
 
                 # 分型是否相同。
                 # 分型的距离。
-                new_fractal = self._generate_fractal(
-                    log_level,
+                new_fractal = generate_fractal(
                     left_candle,
                     middle_candle,
                     right_candle,
-                    last_fractal=None,
-                    determine_distance=False,
-                    determine_pattern=False
+                    last_fractal=None
                 )
 
                 if new_fractal is not None:

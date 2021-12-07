@@ -45,11 +45,23 @@ from .log_message import (
     log_event_stroke_pivot_generated,
     log_event_stroke_pivot_extended,
 
+    log_try_to_generate_first_stroke,
     log_try_to_generate_stroke,
+    log_try_to_update_stroke,
     log_show_2_candles,
     log_show_3_candles,
+
+    log_failed_in_not_enough_merged_candles,
+    log_show_right_side_info_in_generating_stroke,
+    log_show_left_side_info_in_generating_stroke,
+    log_test_result_distance,
+    log_test_result_fractal,
+    log_test_result_fractal_pattern,
+    log_test_result_price_range,
+    log_test_result_price_break,
 )
 from .utility import (
+    is_fractal_pattern,
     is_regular_fractal,
     is_potential_fractal,
     generate_merged_candle,
@@ -200,195 +212,189 @@ class ChanTheoryDynamic(ChanTheory):
                 'No merged candle data, run <generate_merged_candles_with_dataframe> before.'
             )
 
-        # Declare variables。
-        potential_fractal_pattern: FractalPattern
-        potential_fractal_candle: MergedCandle = self._merged_candles[-1]
-        is_fractal: bool
-
-        # Get the potential fractal (the last candle) pattern.
-        is_fractal, potential_fractal_pattern = is_potential_fractal(
-            [
-                self._merged_candles[-2],
-                self._merged_candles[-1]
-            ],
-            FirstOrLast.Last
-        )
-
         # log trying.
-        log_try_to_generate_stroke(log_level=log_level)
+        log_try_to_generate_first_stroke(log_level=log_level)
 
-        log_show_2_candles(
-            log_level=log_level,
-            left_candle=self._merged_candles[0],
-            right_candle=self._merged_candles[1]
-        )
-        if log_level.value >= LogLevel.Detailed.value:
-            print(
-                f'\n  ○ 尝试生成笔：'
-                f'\n    最新合并K线，'
-                f'id（合并K线）= {potential_fractal_candle.id}，'
-                f'id（普通K线）= {potential_fractal_candle.ordinary_id}，'
-                f'分型（潜在） = {potential_fractal_pattern.value}。'
+        # log "not enough merged candles".
+        if self.merged_candles_count < self.minimum_distance:
+            log_failed_in_not_enough_merged_candles(
+                log_level=log_level,
+                count=self.merged_candles_count,
+                required=self.minimum_distance
             )
+            return Action.NothingChanged
+
+        # Declare variables。
+        right_side_candle_left: MergedCandle = self._merged_candles[-2]
+        right_side_candle_middle: MergedCandle = self._merged_candles[-1]
+        right_fractal_pattern: Optional[FractalPattern] = is_fractal_pattern(
+            left_candle=self._merged_candles[-2],
+            middle_candle=self._merged_candles[-1],
+            right_candle=None
+        )
+
+        log_show_right_side_info_in_generating_stroke(
+            log_level=log_level,
+            left_candle=right_side_candle_left,
+            middle_candle=right_side_candle_middle,
+            fractal_pattern=right_fractal_pattern
+        )
 
         # 申明变量类型并赋值。
-        left_candle: MergedCandle
-        middle_candle: MergedCandle
-        right_candle: MergedCandle
+        left_side_candle_left: Optional[MergedCandle]
+        left_side_candle_middle: MergedCandle
+        left_side_candle_right: MergedCandle
         left_fractal_pattern: FractalPattern
 
         # 开始循环。
-        for i in range(1, potential_fractal_candle.id):
+        for i in range(1, right_side_candle_middle.id):
 
-            # 取得 left_merged_candle。
-            left_candle = self._merged_candles[i]
-            if log_level.value >= LogLevel.Detailed.value:
-                print(
-                    f'    左合并K线，'
-                    f'id（合并K线）= {left_candle.id}，'
-                    f'id（普通K线）= {left_candle.ordinary_id}'
-                )
-
-            # 判定距离。
-            # 如果：
-            #     left_candle 与 right_candle 之间的距离不满足最小要求
-            # 退出循环。
-            distance: int = potential_fractal_candle.id - left_candle.id
-
-            if distance < self.minimum_distance:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print(f'        距离 = {distance}，< {self.minimum_distance}，不满足。')
-                return Action.NothingChanged
+            # Get left side candles.
+            if i == 1:
+                left_side_candle_left = None
+                left_side_candle_middle = self._merged_candles[i - 1]
+                left_side_candle_right = self._merged_candles[i]
             else:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print(f'        距离 = {distance}，≥ {self.minimum_distance}，满足。')
+                left_side_candle_left = self._merged_candles[i - 2]
+                left_side_candle_middle = self._merged_candles[i - 1]
+                left_side_candle_right = self._merged_candles[i]
 
-            # 判定正规分型。
-            left_candle = self._merged_candles[i - 1]
-            middle_candle = self._merged_candles[i]
-            right_candle = self._merged_candles[i + 1]
-            is_fractal, left_fractal_pattern = is_regular_fractal(
-                left_candle,
-                middle_candle,
-                right_candle,
+            # Log left side candles.
+            log_show_left_side_info_in_generating_stroke(
+                log_level=log_level,
+                left_candle=left_side_candle_left,
+                middle_candle=left_side_candle_middle,
+                right_candle=left_side_candle_right
             )
 
-            # 如果：
-            #     left_candle 不能形成分型
-            # 退出循环。
-            if not is_fractal:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print('        正式分型 = 不是分型，不满足。')
+            # 测试：是否满足最小距离要求。
+            distance: int = right_side_candle_middle.id - left_side_candle_middle.id
+
+            # Log distance test result.
+            log_test_result_distance(
+                log_level=log_level,
+                distance=distance,
+                minimum_distance=self.minimum_distance
+            )
+
+            # 如果测试未通过，进入下一次合并K线循环。
+            if distance < self.minimum_distance:
+                return Action.NothingChanged
+
+            # 测试：是否可以构成分型。
+            left_fractal_pattern = is_fractal_pattern(
+                left_candle=left_side_candle_left,
+                middle_candle=left_side_candle_middle,
+                right_candle=left_side_candle_right
+            )
+
+            # 显示测试结果。
+            log_test_result_fractal(
+                log_level=log_level,
+                fractal_pattern=left_fractal_pattern
+            )
+
+            # 如果测试未通过，进入下一次合并K线循环。
+            if left_fractal_pattern is None:
                 continue
 
             # 如果：
             #     形成的分型与 right_merged_candle 形成的潜在分型同类
             # 退出循环。
-            if left_fractal_pattern == potential_fractal_pattern:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print(f'        正式分型 = {left_fractal_pattern.value}，与右侧潜在分型相同，不满足。')
+            # Log fractal pattern test result.
+            log_test_result_fractal_pattern(
+                log_level=log_level,
+                left_fractal_pattern=left_fractal_pattern,
+                right_fractal_pattern=right_fractal_pattern
+            )
+
+            if left_fractal_pattern == right_fractal_pattern:
                 continue
-            else:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print(f'        正式分型 = {left_fractal_pattern.value}，与右侧潜在分型不同，满足。')
 
             # 判定两端分型的中间K线。
             price_low: float
             price_high: float
-            if potential_fractal_pattern == FractalPattern.Top:
-                price_low = middle_candle.low
-                price_high = potential_fractal_candle.high
+            if right_fractal_pattern == FractalPattern.Top:
+                price_low = left_side_candle_middle.low
+                price_high = right_side_candle_middle.high
             else:
-                price_low = potential_fractal_candle.low
-                price_high = middle_candle.high
+                price_low = right_side_candle_middle.low
+                price_high = left_side_candle_middle.high
 
             is_price_break_high: bool = False
             is_price_break_low: bool = False
             candle: MergedCandle
-            for j in range(middle_candle.id + 1, potential_fractal_candle.id):
+            price_break_candle: Optional[MergedCandle] = None
+            for j in range(left_side_candle_middle.id + 1, right_side_candle_middle.id):
                 candle = self.merged_candles[j]
                 if candle.low < price_low:
                     is_price_break_low = True
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print(
-                            f'        第 {j} 个合并K线的最低价 = {candle.low}，'
-                            f'超越了两个分型的最低价 {price_low}，不满足。'
-                        )
-                    continue
+                    price_break_candle = candle
+                    break
                 if candle.high > price_high:
                     is_price_break_high = True
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print(
-                            f'        第 {j} 个合并K线的最高价 = {candle.high}，'
-                            f'超越了两个分型的最低价 {price_high}，不满足。'
-                        )
-                    continue
+                    price_break_candle = candle
+                    break
+
+            log_test_result_price_range(
+                log_level=log_level,
+                break_high=is_price_break_high,
+                break_low=is_price_break_low,
+                candle=price_break_candle
+            )
 
             if is_price_break_high or is_price_break_low:
                 continue
-
-            if log_level.value >= LogLevel.Detailed.value:
-                print(f'        两个分型之间的合并K线均没有超越分型的最高价或者最低价，满足。')
 
             # 创建首对分型
             new_fractal: Fractal = Fractal(
                 id=self.fractals_count,
                 pattern=left_fractal_pattern,
-                left_candle=left_candle,
-                middle_candle=middle_candle,
-                right_candle=right_candle,
+                left_candle=left_side_candle_left,
+                middle_candle=left_side_candle_middle,
+                right_candle=left_side_candle_right,
                 is_confirmed=True
             )
-            if self._log:
-                print(
-                    LOG_FRACTAL_GENERATED.format(
-                        id=new_fractal.id + 1,
-                        pattern=new_fractal.pattern,
-                        mc_id=new_fractal.merged_id,
-                        oc_id=new_fractal.ordinary_id
-                    )
-                )
             self._fractals.append(new_fractal)
+            log_event_fractal_generated(
+                log_level=log_level,
+                new_fractal=new_fractal
+            )
 
             new_fractal: Fractal = Fractal(
                 id=self.fractals_count,
-                pattern=potential_fractal_pattern,
-                left_candle=left_candle,
-                middle_candle=middle_candle,
+                pattern=right_fractal_pattern,
+                left_candle=right_side_candle_left,
+                middle_candle=right_side_candle_middle,
                 right_candle=None,
                 is_confirmed=False
             )
-            if self._log:
-                print(
-                    LOG_FRACTAL_GENERATED.format(
-                        id=new_fractal.id + 1,
-                        pattern=new_fractal.pattern,
-                        mc_id=new_fractal.merged_id,
-                        oc_id=new_fractal.ordinary_id
-                    )
-                )
             self._fractals.append(new_fractal)
+            log_event_fractal_generated(
+                log_level=log_level,
+                new_fractal=new_fractal
+            )
 
             new_stroke: Stroke = Stroke(
                 id=self.strokes_count,
                 trend=Trend.Bullish if left_fractal_pattern == FractalPattern.Bottom
                 else Trend.Bearish,
-                left_candle=middle_candle,
-                right_candle=potential_fractal_candle
+                left_candle=left_side_candle_middle,
+                right_candle=right_side_candle_middle
             )
-
+            self._strokes.append(new_stroke)
             log_event_stroke_generated(
                 log_level=log_level,
                 new_stroke=new_stroke
             )
 
-            self._strokes.append(new_stroke)
-
             return Action.StrokeGenerated
 
         return Action.NothingChanged
 
-    def extend_stroke(self) -> Action:
+    def extend_stroke(self,
+                      log_level: LogLevel = LogLevel.Normal
+                      ) -> Action:
         """
         延伸笔，同时修正分型。
 
@@ -407,74 +413,52 @@ class ChanTheoryDynamic(ChanTheory):
         last_stroke: Stroke = self._strokes[-1]
         last_fractal: Fractal = self._fractals[-1]
         last_candle: MergedCandle = self._merged_candles[-1]
+        is_updated: bool = False
 
-        if log_level.value >= LogLevel.Detailed.value:
-            print(
-                f'\n  ○ 尝试延伸笔：'
-                f'\n    最新笔 id = {last_stroke.id}，趋势 = {last_stroke.trend.value}，'
-                f'右侧合并K线 id = {last_stroke.right_candle.id}，右侧价 = {last_stroke.right_price}'
-                f'\n    最新合并K线 id = {last_candle.id}，'
-                f'最高价 = {last_candle.high}，最低价 = {last_candle.low}'
-            )
+        # log trying.
+        log_try_to_update_stroke(log_level=log_level)
 
         if last_stroke.trend == Trend.Bullish:
-            if last_candle.high < last_stroke.right_price:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print('        最新合并K线的最高价 <= 最新笔的右侧价，不满足。')
-                if last_fractal.right_candle is None:
-                    last_fractal.right_candle = last_candle
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print('    最新分型的右侧合并K线已填补，最新分型由潜在分型修正为正是分型。')
-                return Action.NothingChanged
-            else:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print('        最新合并K线的最高价 > 最新笔的右侧价，满足。')
+            if last_candle.high >= last_stroke.right_price:
+                is_updated = True
 
-        else:   # last_stroke.trend == Trend.Bearish
-            if last_candle.low > last_stroke.right_price:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print('        最新合并K线的最高价 >= 最新笔的右侧价，不满足。')
-                if last_fractal.right_candle is None:
-                    last_fractal.right_candle = last_candle
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print('    最新分型的右侧合并K线已填补，最新分型由潜在分型修正为正是分型。')
-                return Action.NothingChanged
-            else:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print('        最新合并K线的最高价 < 最新笔的右侧价，满足。')
+        else:  # last_stroke.trend == Trend.Bearish
+            if last_candle.low <= last_stroke.right_price:
+                is_updated = True
+
+        log_test_result_price_break(
+            log_level=log_level,
+            stroke=last_stroke,
+            candle=last_candle
+        )
+
+        if is_updated is False:
+            return Action.NothingChanged
 
         # 修正分型。
-        last_fractal: Fractal = self._fractals[-1]
         last_fractal.left_candle = last_fractal.middle_candle
         last_fractal.middle_candle = last_candle
-        if self._log:
-            print(
-                LOG_FRACTAL_UPDATED.format(
-                    id=last_fractal.id + 1,
-                    pattern=last_fractal.pattern,
-                    extreme_price=last_fractal.extreme_price,
-                    mc_id=last_candle.id,
-                    oc_id=last_candle.ordinary_id
-                )
-            )
+
+        log_event_fractal_updated(
+            log_level=log_level,
+            old_fractal=last_fractal,
+            new_candle=last_candle
+        )
 
         # 延伸笔。
-        if self._log:
-            print(
-                LOG_STROKE_EXTENDED.format(
-                    id=last_stroke.id + 1,
-                    trend=last_stroke.trend,
-                    old_mc_id=last_stroke.right_candle.id,
-                    new_mc_id=last_candle.id,
-                    old_oc_id=last_stroke.right_candle.ordinary_id,
-                    new_oc_id=last_candle.ordinary_id
-                )
-            )
         last_stroke.right_candle = last_candle
+
+        log_event_stroke_updated(
+            log_level=log_level,
+            old_stroke=last_stroke,
+            new_candle=last_candle
+        )
 
         return Action.StrokeExtended
 
-    def generate_following_stroke(self) -> Action:
+    def generate_following_stroke(self,
+                                  log_level: LogLevel = LogLevel.Normal
+                                  ) -> Action:
         """
         生成后续的笔以及分型。
 
@@ -491,17 +475,16 @@ class ChanTheoryDynamic(ChanTheory):
         :return:
         """
 
+        # 申明变量类型并赋值。
         last_candle: MergedCandle = self._merged_candles[-1]
         last_stroke: Stroke = self._strokes[-1]
 
-        if log_level.value >= LogLevel.Detailed.value:
-            print(
-                f'\n  ○ 尝试生成后续笔：'
-                f'\n    最新笔 id = {last_stroke.id}，趋势 = {last_stroke.trend}，'
-                f'右侧 id（合并K线）= {last_stroke.right_merged_id}，右侧价 = {last_stroke.right_price}'
-                f'\n    最新合并K线 id = {last_candle.id}，'
-                f'最高价 = {last_candle.high}，最低价 = {last_candle.low}'
-            )
+        # log trying.
+        log_try_to_generate_stroke(
+            log_level=log_level,
+            stroke=last_stroke,
+            candle=last_candle
+        )
 
         # 判定距离。
         distance = last_candle.id - last_stroke.right_candle.id

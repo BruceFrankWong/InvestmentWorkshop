@@ -6,6 +6,7 @@ __author__ = 'Bruce Frank Wong'
 from typing import List, Tuple, Optional
 
 from .definition import (
+    LogLevel,
     FirstOrLast,
     FractalPattern,
     Trend,
@@ -15,6 +16,17 @@ from .definition import (
     Fractal,
     Stroke,
     Segment,
+)
+from .log_message import (
+    log_not_enough_merged_candles,
+    log_show_right_side_info_in_generating_stroke,
+    log_show_left_side_info_in_generating_stroke,
+
+    log_test_result_distance,
+    log_test_result_fractal,
+    log_test_result_fractal_pattern,
+    log_test_result_price_range,
+    log_test_result_price_break,
 )
 
 
@@ -97,10 +109,10 @@ def is_regular_fractal(left_candle: MergedCandle,
         return None
 
 
-def is_fractal(left_candle: Optional[MergedCandle],
-               middle_candle: MergedCandle,
-               right_candle: Optional[MergedCandle]
-               ) -> Optional[FractalPattern]:
+def is_fractal_pattern(left_candle: Optional[MergedCandle],
+                       middle_candle: MergedCandle,
+                       right_candle: Optional[MergedCandle]
+                       ) -> Optional[FractalPattern]:
     """
 
     :param left_candle:
@@ -439,11 +451,22 @@ def generate_merged_candle(ordinary_candle: OrdinaryCandle,
 def generate_fractal(left_candle: MergedCandle,
                      middle_candle: MergedCandle,
                      right_candle: MergedCandle,
+                     candles: List[MergedCandle],
                      last_fractal: Optional[Fractal],
-                     strict_mode: bool = True
+                     strict_mode: bool = True,
+                     log_level: LogLevel = LogLevel.Normal
                      ) -> Optional[Fractal]:
     """
-    Generate fractal.
+    Generate a single fractal.
+
+    The two fractals should be:
+    1. the distance between the two candles in the middle of each fractal,
+       should be equal to the <minimum_distance>, or larger than it.
+    2. the pattern of each fractal, should be different.
+    3. the low price of the bottom fractal, should be the last lowest one,
+       or the last second lowest one.
+    4. the high price of the bottom fractal, should be the last highest one,
+       or the last second highest one.
 
     :param left_candle:
     :param middle_candle:
@@ -454,40 +477,252 @@ def generate_fractal(left_candle: MergedCandle,
     """
     minimum_distance: int = 4 if strict_mode else 3
 
-    # 判定分型。
-    pattern: FractalPattern
-    if middle_candle.high > left_candle.high and \
-            middle_candle.high > right_candle.high:
-        pattern = FractalPattern.Top
-
-    elif middle_candle.low < left_candle.low and \
-            middle_candle.low < right_candle.low:
-        pattern = FractalPattern.Bottom
-
-    elif left_candle.high < middle_candle.high < right_candle.high:
+    count: int = log_level
+    if count < minimum_distance:
+        log_not_enough_merged_candles(
+            log_level=log_level,
+            count=count,
+            required=minimum_distance
+        )
         return None
 
-    elif left_candle.high > middle_candle.high > right_candle.high:
-        return None
+    # Generate the first pair of fractals.
+    if last_fractal is None:
+        pass
 
+
+    # The next fractal.
     else:
-        raise RuntimeError('【ERROR】')
-
-    if last_fractal is not None:
-        # 判定模式。
-        if pattern == last_fractal.pattern:
-            return None
-
-        # 判定距离。
-        distance = middle_candle.id - last_fractal.merged_id
+        # Test: distance.
+        # <distance> should be equal to or large than <minimum_distance>.
+        distance = candles[-1].id - last_fractal.merged_id
         if distance < minimum_distance:
             return None
 
+        # Test: fractal.
+        new_fractal_pattern: FractalPattern
+        if middle_candle.high > left_candle.high and \
+                middle_candle.high > right_candle.high:
+            new_fractal_pattern = FractalPattern.Top
+
+        elif middle_candle.low < left_candle.low and \
+                middle_candle.low < right_candle.low:
+            new_fractal_pattern = FractalPattern.Bottom
+
+        elif left_candle.high < middle_candle.high < right_candle.high:
+            return None
+
+        elif left_candle.high > middle_candle.high > right_candle.high:
+            return None
+
+        else:
+            raise RuntimeError('【ERROR】')
+
+        # Test: fractal pattern.
+        if last_fractal is not None:
+            if new_fractal_pattern == last_fractal.pattern:
+                return None
+
+    # Test: price in range.
+    # Price of candles between the two fractals, should not reach or beyond the price of fractals.
+
+
     return Fractal(
         id=0 if last_fractal is None else last_fractal.id + 1,
-        pattern=pattern,
+        pattern=new_fractal_pattern,
         left_candle=left_candle,
         middle_candle=middle_candle,
         right_candle=right_candle,
         is_confirmed=False
     )
+
+
+def generate_stroke(candles: List[MergedCandle],
+                    last_stroke: Optional[Stroke] = None,
+                    strict_mode: bool = True,
+                    log_level: LogLevel = LogLevel.Normal
+                    ) -> Optional[Stroke]:
+    """
+    Generate a single stroke.
+
+    A stroke is a segment (on Geometry, not Chan Theory), and each endpoint is a fractal.
+    The two fractals should be:
+    1. the distance between the two candles in the middle of each fractal,
+       should be equal to the <minimum_distance>, or larger than it.
+    2. the pattern of each fractal, should be different.
+    3. the low price of the bottom fractal, should be the last lowest one,
+       or the last second lowest one.
+    4. the high price of the bottom fractal, should be the last highest one,
+       or the last second highest one.
+
+    :param candles:
+    :param last_stroke:
+    :param strict_mode:
+    :param log_level:
+    :return:
+    """
+    minimum_distance: int = 4 if strict_mode else 3
+
+    count: int = len(candles)
+    if count < minimum_distance + 1:
+        log_not_enough_merged_candles(
+            log_level=log_level,
+            count=count,
+            required=minimum_distance + 1
+        )
+        return None
+
+    # Generate the first stroke.
+    if last_stroke is None:
+        # Declare variables and assign value.
+        fixed_side_left_candle: Optional[MergedCandle]
+        fixed_side_middle_candle: MergedCandle
+        fixed_side_right_candle: MergedCandle
+        fixed_side_fractal_pattern: FractalPattern
+
+        right_side_candle_left: MergedCandle = candles[-2]
+        right_side_candle_middle: MergedCandle = candles[-1]
+        right_fractal_pattern: Optional[FractalPattern] = is_fractal_pattern(
+            left_candle=right_side_candle_left,
+            middle_candle=right_side_candle_middle,
+            right_candle=None
+        )
+
+        # Get right side fractal.
+        # if last_stroke is not None:
+        #     right_fractal_pattern = last_stroke.
+
+        # Log right side candles.
+        log_show_right_side_info_in_generating_stroke(
+            log_level=log_level,
+            left_candle=right_side_candle_left,
+            middle_candle=right_side_candle_middle,
+            fractal_pattern=right_fractal_pattern
+        )
+
+        # Loop.
+        for i in range(1, count):
+            # Get left side candles.
+            if i == 1:
+                fixed_side_left_candle = None
+                fixed_side_middle_candle = candles[i - 1]
+                fixed_side_right_candle = candles[i]
+            else:
+                fixed_side_left_candle = candles[i - 2]
+                fixed_side_middle_candle = candles[i - 1]
+                fixed_side_right_candle = candles[i]
+
+            # Log left side candles.
+            log_show_left_side_info_in_generating_stroke(
+                log_level=log_level,
+                left_candle=fixed_side_left_candle,
+                middle_candle=fixed_side_middle_candle,
+                right_candle=fixed_side_right_candle
+            )
+
+            # Test:
+            # the distance between <left_side_candle_middle> and <right_side_candle_middle>,
+            # should be equal or large than minimum distance.
+            distance: int = right_side_candle_middle.id - fixed_side_middle_candle.id
+
+            # Log distance test result.
+            log_test_result_distance(
+                log_level=log_level,
+                distance=distance,
+                minimum_distance=minimum_distance
+            )
+
+            # If failed in distance test, exit the loop.
+            # Cause then next <left_side_candle_middle> is more right.
+            if distance < minimum_distance:
+                return None
+
+            # Test:
+            # the left side candles should generate a fractal.
+            fixed_side_fractal_pattern = is_fractal_pattern(
+                left_candle=fixed_side_left_candle,
+                middle_candle=fixed_side_middle_candle,
+                right_candle=fixed_side_right_candle
+            )
+
+            # Log fractal generation test result.
+            log_test_result_fractal(
+                log_level=log_level,
+                fractal_pattern=fixed_side_fractal_pattern
+            )
+
+            # If failed in fractal generation test, go to the next loop.
+            if fixed_side_fractal_pattern is None:
+                continue
+
+            # Test:
+            # the pattern of left side fractal should be different with the right side.
+
+            # Log fractal pattern test result.
+            log_test_result_fractal_pattern(
+                log_level=log_level,
+                left_fractal_pattern=fixed_side_fractal_pattern,
+                right_fractal_pattern=right_fractal_pattern
+            )
+
+            # If failed in fractal pattern test, go to the next loop.
+            if fixed_side_fractal_pattern == right_fractal_pattern:
+                continue
+
+            # Test:
+            # price of candles in the two fractals, should not reach or beyond the price of fractals.
+            price_low: float
+            price_high: float
+            if right_fractal_pattern == FractalPattern.Top:
+                price_low = fixed_side_middle_candle.low
+                price_high = right_side_candle_middle.high
+            else:
+                price_low = right_side_candle_middle.low
+                price_high = fixed_side_middle_candle.high
+
+            is_price_break_high: bool = False
+            is_price_break_low: bool = False
+            candle: MergedCandle
+            price_break_candle: Optional[MergedCandle] = None
+            for j in range(fixed_side_middle_candle.id + 1, right_side_candle_middle.id):
+                candle = candles[j]
+                if candle.low < price_low:
+                    is_price_break_low = True
+                    price_break_candle = candle
+                    break
+                if candle.high > price_high:
+                    is_price_break_high = True
+                    price_break_candle = candle
+                    break
+
+            # Log price in range test result.
+            log_test_result_price_range(
+                log_level=log_level,
+                break_high=is_price_break_high,
+                break_low=is_price_break_low,
+                candle=price_break_candle
+            )
+
+            # If failed in price in range test, go to the next loop.
+            if is_price_break_high or is_price_break_low:
+                continue
+
+            # Generate the stroke.
+            return Stroke(
+                id=0 if last_stroke is None else last_stroke.id + 1,
+                trend=Trend.Bullish if fixed_side_fractal_pattern == FractalPattern.Bottom
+                else Trend.Bearish,
+                left_candle=fixed_side_middle_candle,
+                right_candle=right_side_candle_middle
+            )
+
+    # Generate the next stroke.
+    else:
+        fixed_side_fractal_pattern: FractalPattern
+        if last_stroke.trend == Trend.Bullish:
+            fixed_side_fractal_pattern = FractalPattern.Top
+        else:
+            fixed_side_fractal_pattern = FractalPattern.Bottom
+
+        for i in range(count):
+            pass

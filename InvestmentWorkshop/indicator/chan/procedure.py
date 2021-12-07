@@ -25,12 +25,13 @@ from .definition import (
     ChanTheory,
 )
 from .utility import (
-    is_fractal,
+    is_fractal_pattern,
     is_left_potential_fractal,
     is_right_potential_fractal,
     is_overlap,
     generate_merged_candle,
     generate_fractal,
+    generate_stroke,
 )
 from .log_message import (
     log_event_new_turn,
@@ -50,13 +51,22 @@ from .log_message import (
 
     log_try_to_generate_fractal,
     log_try_to_update_fractal,
+    log_try_to_generate_first_stroke,
     log_try_to_generate_stroke,
     log_try_to_update_stroke,
 
     log_show_2_candles,
     log_show_3_candles,
+    log_show_left_side_info_in_generating_stroke,
+    log_show_right_side_info_in_generating_stroke,
 
     log_failed_in_not_enough_merged_candles,
+
+    log_test_result_distance,
+    log_test_result_fractal,
+    log_test_result_fractal_pattern,
+    log_test_result_price_range,
+    log_test_result_price_break,
 )
 
 
@@ -351,13 +361,15 @@ def generate_fractals(merged_candles: List[MergedCandle],
 
 
 def generate_strokes(merged_candles: List[MergedCandle],
+                     strict_mode: bool = True,
                      count: Optional[int] = None,
                      log_level: LogLevel = LogLevel.Normal
-                     ) -> List[Stroke]:
+                     ) -> Optional[List[Stroke]]:
     """
     Generate stroke for Chan Theory.
 
     :param merged_candles:
+    :param strict_mode:
     :param count:
     :param log_level:
     :return: List[Stroke].
@@ -373,16 +385,8 @@ def generate_strokes(merged_candles: List[MergedCandle],
         )
 
     # Declare variables.
+    minimum_distance: int = 4 if strict_mode else 3
     strokes: List[Stroke] = []
-    merged_candle: MergedCandle
-
-    last_stroke: Stroke
-    left_candle: MergedCandle
-    middle_candle: MergedCandle
-    right_candle: MergedCandle
-
-    previous_fractal: MergedCandle = merged_candles[0]
-    current_fractal: MergedCandle
 
     # Loop.
     for idx in range(count):
@@ -391,8 +395,8 @@ def generate_strokes(merged_candles: List[MergedCandle],
 
         # 如果 strokes 列表的长度 == 0，尝试生成首个笔。
         if len(strokes) == 0:
-            # log
-            log_try_to_generate_stroke(log_level=log_level)
+            # log trying.
+            log_try_to_generate_first_stroke(log_level=log_level)
 
             # Required.
             required: int = 5
@@ -405,69 +409,163 @@ def generate_strokes(merged_candles: List[MergedCandle],
                 continue
 
             # Get the lower candle and higher candle.
-            lower_candle: MergedCandle = merged_candles[0]
-            higher_candle: MergedCandle = merged_candles[0]
-            current_candle: MergedCandle
+            last_left_candle: MergedCandle = merged_candles[idx - 1]
+            last_middle_candle: MergedCandle = merged_candles[idx]
+            right_fractal_pattern: Optional[FractalPattern] = is_fractal_pattern(
+                left_candle=last_left_candle,
+                middle_candle=last_middle_candle,
+                right_candle=None
+            )
+
+            log_show_right_side_info_in_generating_stroke(
+                log_level=log_level,
+                left_candle=last_left_candle,
+                middle_candle=last_middle_candle,
+                fractal_pattern=right_fractal_pattern
+            )
+
+            new_stroke: Optional[Stroke] = None
+            left_candle: Optional[MergedCandle]
+            middle_candle: MergedCandle
+            right_candle: MergedCandle
+            left_fractal_pattern: Optional[FractalPattern]
             for i in range(1, idx):
-                current_candle = merged_candles[i]
 
-                if current_candle.low < lower_candle.low:
-                    lower_candle = current_candle
-                if current_candle.high > higher_candle.high:
-                    higher_candle = current_candle
+                # Get left side candles.
+                if i == 1:
+                    left_candle = None
+                    middle_candle = merged_candles[i - 1]
+                    right_candle = merged_candles[i]
+                else:
+                    left_candle = merged_candles[i - 2]
+                    middle_candle = merged_candles[i - 1]
+                    right_candle = merged_candles[i]
 
-            distance: int = max(higher_candle.id, lower_candle.id) - \
-                min(higher_candle.id, lower_candle.id)
-
-            if log_level.value >= LogLevel.Detailed.value:
-                print(
-                    f'    当前合并K线数量 = {idx + 1}。\n',
-                    f'    最低  low = {lower_candle.low}，',
-                    f'id：合并K线= {lower_candle.id}，普通K线= {lower_candle.ordinary_id}。\n',
-                    f'    最高 high = {higher_candle.high}，',
-                    f'id：合并K线= {higher_candle.id}，普通K线= {higher_candle.ordinary_id}。\n',
-                    f'    距离 = {distance}。'
+                # Log left side candles.
+                log_show_left_side_info_in_generating_stroke(
+                    log_level=log_level,
+                    left_candle=left_candle,
+                    middle_candle=middle_candle,
+                    right_candle=right_candle
                 )
+
+                # Distance test.
+                distance: int = last_middle_candle.id - middle_candle.id
+
+                # Log distance test result.
+                log_test_result_distance(
+                    log_level=log_level,
+                    distance=distance,
+                    minimum_distance=minimum_distance
+                )
+
+                if distance < minimum_distance:
+                    break
+
+                # Fractal test.
+                left_fractal_pattern = is_fractal_pattern(
+                    left_candle=left_candle,
+                    middle_candle=middle_candle,
+                    right_candle=right_candle
+                )
+
+                # Log fractal test result.
+                log_test_result_fractal(
+                    log_level=log_level,
+                    fractal_pattern=left_fractal_pattern
+                )
+
+                if left_fractal_pattern is None:
+                    continue
+
+                # Log fractal pattern test result.
+                log_test_result_fractal_pattern(
+                    log_level=log_level,
+                    left_fractal_pattern=left_fractal_pattern,
+                    right_fractal_pattern=right_fractal_pattern
+                )
+
+                if left_fractal_pattern == right_fractal_pattern:
+                    continue
+
+                # 判定两端分型的中间K线。
+                price_low: float
+                price_high: float
+                if right_fractal_pattern == FractalPattern.Top:
+                    price_low = middle_candle.low
+                    price_high = last_middle_candle.high
+                else:
+                    price_low = last_middle_candle.low
+                    price_high = middle_candle.high
+
+                is_price_break_high: bool = False
+                is_price_break_low: bool = False
+                candle: MergedCandle
+                price_break_candle: Optional[MergedCandle] = None
+                for j in range(middle_candle.id + 1, last_middle_candle.id):
+                    candle = merged_candles[j]
+                    if candle.low < price_low:
+                        is_price_break_low = True
+                        price_break_candle = candle
+                        break
+                    if candle.high > price_high:
+                        is_price_break_high = True
+                        price_break_candle = candle
+                        break
+
+                log_test_result_price_range(
+                    log_level=log_level,
+                    break_high=is_price_break_high,
+                    break_low=is_price_break_low,
+                    candle=price_break_candle
+                )
+                if is_price_break_high or is_price_break_low:
+                    continue
+
+                # 创建首个笔。
+                new_stroke = Stroke(
+                    id=0,
+                    trend=Trend.Bullish if left_fractal_pattern == FractalPattern.Bottom
+                    else Trend.Bearish,
+                    left_candle=middle_candle,
+                    right_candle=last_middle_candle
+                )
+
+                log_event_stroke_generated(
+                    log_level=log_level,
+                    new_stroke=new_stroke
+                )
+                break
+
+            if new_stroke is not None:
+                strokes.append(new_stroke)
+
             continue
 
         # 如果 strokes 列表的长度 >= 1，尝试修正笔。
         if len(strokes) >= 1:
-            # 最新的笔
-            last_stroke = strokes[-1]
-            # 最新的合并K线
-            last_candle = merged_candles[idx]
+            # 申明变量类型并赋值
+            last_stroke = strokes[-1]               # 最新的笔
+            last_candle = merged_candles[idx]       # 最新的合并K线
+            is_updated: bool = False                # 是否更新
 
-            # log
+            # log trying.
             log_try_to_update_stroke(log_level=log_level)
-
-            is_updated: bool = False
 
             # 如果当前合并K线顺向突破（即最高价大于顶分型中间K线的最高价，对底分型反之）。
             if last_stroke.trend == Trend.Bullish:
-                if last_candle.high < last_stroke.right_price:
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print(
-                            ' ' * 8, f'最新合并K线的最高价 <= 最新笔的右侧价，不满足。'
-                        )
-                else:
+                if last_candle.high >= last_stroke.right_price:
                     is_updated = True
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print(
-                            ' ' * 8, f'最新合并K线的最高价 > 最新笔的右侧价，满足。'
-                        )
 
             else:  # last_stroke.trend == Trend.Bearish
-                if last_candle.low > last_stroke.right_price:
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print(
-                            ' ' * 8, f'最新合并K线的最高价 >= 最新笔的右侧价，不满足。'
-                        )
-                else:
+                if last_candle.low <= last_stroke.right_price:
                     is_updated = True
-                    if log_level.value >= LogLevel.Detailed.value:
-                        print(
-                            ' ' * 8, f'最新合并K线的最高价 < 最新笔的右侧价，满足。'
-                        )
+
+            log_test_result_price_break(
+                log_level=log_level,
+                stroke=last_stroke,
+                candle=last_candle
+            )
 
             if is_updated:
                 log_event_stroke_updated(
@@ -481,32 +579,89 @@ def generate_strokes(merged_candles: List[MergedCandle],
 
                 continue
 
-        current_fractal = merged_candles[idx]
-        if current_fractal.pattern == previous_fractal.pattern:
-            continue
-        trend: Trend
-        if previous_fractal.pattern == FractalPattern.Bottom:
-            trend = Trend.Bullish
+        # 创建后续笔。
+
+        # 申明变量类型并赋值。
+        last_candle: MergedCandle = merged_candles[idx]
+        last_stroke: Stroke = strokes[-1]
+        left_side_fractal_pattern: FractalPattern
+
+        right_side_fractal_pattern: FractalPattern
+
+        if last_stroke.trend == Trend.Bullish:
+            left_side_fractal_pattern = FractalPattern.Top
         else:
-            trend = Trend.Bearish
+            left_side_fractal_pattern = FractalPattern.Bottom
+
+        # log trying.
+        log_try_to_generate_stroke(
+            log_level=log_level,
+            stroke=last_stroke,
+            candle=last_candle
+        )
+
+        # generate_stroke(
+        #     candles=[
+        #         merged_candles[i] for i in range(last_stroke.right_candle.id, last_candle.id + 1)
+        #     ],
+        #     last_stroke=last_stroke,
+        #     log_level=log_level
+        # )
+
+        # Test:
+        # the distance between <left_side_candle_middle> and <right_side_candle_middle>,
+        # should be equal or large than minimum distance.
+        distance = last_candle.id - last_stroke.right_candle.id
+
+        # Log distance test result.
+        log_test_result_distance(
+            log_level=log_level,
+            distance=distance,
+            minimum_distance=minimum_distance
+        )
+
+        # If failed in distance test, exit the loop.
+        # Cause then next <left_side_candle_middle> is more right.
+        if distance < minimum_distance:
+            continue
+
+        # Test:
+        # the right side fractal pattern should be different with left side.
+        right_side_fractal_pattern = is_fractal_pattern(
+            left_candle=merged_candles[idx - 1],
+            middle_candle=merged_candles[idx],
+            right_candle=None
+        )
+
+        # Log fractal pattern test result.
+        log_test_result_fractal_pattern(
+            log_level=log_level,
+            left_fractal_pattern=left_side_fractal_pattern,
+            right_fractal_pattern=right_side_fractal_pattern
+        )
+
+        if left_side_fractal_pattern == right_side_fractal_pattern:
+            continue
 
         new_stroke: Stroke = Stroke(
             id=len(strokes),
-            trend=trend,
-            left_candle=previous_fractal.middle_candle,
-            right_candle=current_fractal.middle_candle
+            trend=Trend.Bullish if left_side_fractal_pattern == FractalPattern.Bottom
+            else Trend.Bearish,
+            left_candle=last_stroke.right_candle,
+            right_candle=last_candle
         )
-
         strokes.append(new_stroke)
-
-        previous_fractal = current_fractal
+        log_event_stroke_generated(
+            log_level=log_level,
+            new_stroke=new_stroke
+        )
 
     return strokes
 
 
 def generate_segments(strokes: List[Stroke],
                       log_level: LogLevel = LogLevel.Normal
-                      ) -> List[Segment]:
+                      ) -> Optional[List[Segment]]:
     """
     Generate segments for Chan Theory.
 
@@ -514,15 +669,18 @@ def generate_segments(strokes: List[Stroke],
     :param log_level:
     :return:
     """
+
+    # Handle parameters.
     if len(strokes) == 0:
         raise RuntimeError('No stroke data, run <generate_strokes> before.')
 
     if len(strokes) < 3:
-        if verbose:
-            print('Length of strokes less 3.')
+        return None
 
+    # Declare variables.
     segments: List[Segment] = []
 
+    # Loop.
     for idx in range(2, len(strokes)):
         segments_count: int = 0 if segments is None else len(segments)
 
@@ -553,17 +711,10 @@ def generate_segments(strokes: List[Stroke],
 
                 segments.append(new_segment)
 
-                if log_level.value >= LogLevel.Normal.value:
-                    print(
-                        LOG_STROKE_GENERATED.format(
-                            id=new_segment.id + 1,
-                            trend=new_segment.trend,
-                            left_mc_id=new_segment.left_merged_id,
-                            right_mc_id=new_segment.right_merged_id,
-                            left_oc_id=new_segment.left_ordinary_id,
-                            right_oc_id=new_segment.right_ordinary_id
-                        )
-                    )
+                log_event_segment_generated(
+                    log_level=log_level,
+                    new_segment=new_segment
+                )
 
         # 如果 线段的数量 > 0：
         #     1. 延伸线段
@@ -676,13 +827,7 @@ def generate_segments(strokes: List[Stroke],
 
                     log_event_segment_generated(
                         log_level=log_level,
-                        element_id=new_segment.id + 1,
-                        trend=new_segment.trend,
-                        left_mc_id=new_segment.left_merged_id,
-                        right_mc_id=new_segment.left_merged_id,
-                        left_oc_id=new_segment.left_ordinary_id,
-                        right_oc_id=new_segment.right_ordinary_id,
-                        strokes=new_segment.stroke_id_list
+                        new_segment=new_segment
                     )
 
                     continue
