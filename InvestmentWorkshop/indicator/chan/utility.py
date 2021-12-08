@@ -572,14 +572,20 @@ def generate_stroke(candles: List[MergedCandle],
         )
         return None
 
+    # Declare variables.
+    fixed_side_left_candle: Optional[MergedCandle]
+    fixed_side_middle_candle: MergedCandle
+    fixed_side_right_candle: MergedCandle
+    fixed_side_fractal_pattern: FractalPattern
+
+    mobile_side_left_candle: MergedCandle
+    mobile_side_middle_candle: MergedCandle
+    mobile_side_right_candle: MergedCandle
+    mobile_side_fractal_patter: Optional[FractalPattern]
+
     # Generate the first stroke.
     if last_stroke is None:
         # Declare variables and assign value.
-        fixed_side_left_candle: Optional[MergedCandle]
-        fixed_side_middle_candle: MergedCandle
-        fixed_side_right_candle: MergedCandle
-        fixed_side_fractal_pattern: FractalPattern
-
         right_side_candle_left: MergedCandle = candles[-2]
         right_side_candle_middle: MergedCandle = candles[-1]
         right_fractal_pattern: Optional[FractalPattern] = is_fractal_pattern(
@@ -725,4 +731,14 @@ def generate_stroke(candles: List[MergedCandle],
             fixed_side_fractal_pattern = FractalPattern.Bottom
 
         for i in range(count):
-            pass
+            mobile_side_left_candle = candles[i - 2]
+            mobile_side_middle_candle = candles[i - 1]
+            mobile_side_right_candle = candles[i]
+            mobile_side_fractal_patter = is_fractal_pattern(
+                left_candle=right_side_candle_left,
+                middle_candle=right_side_candle_middle,
+                right_candle=None
+            )
+            if mobile_side_fractal_patter is None:
+                continue
+
