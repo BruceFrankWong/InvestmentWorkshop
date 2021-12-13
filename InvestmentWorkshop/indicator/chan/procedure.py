@@ -26,12 +26,10 @@ from .definition import (
 )
 from .utility import (
     is_fractal_pattern,
-    is_left_potential_fractal,
-    is_right_potential_fractal,
     is_overlap,
     generate_merged_candle,
     generate_fractal,
-    generate_stroke,
+    try_to_generate_first_stroke,
 )
 from .log_message import (
     log_event_new_turn,
@@ -52,15 +50,16 @@ from .log_message import (
     log_try_to_generate_fractal,
     log_try_to_update_fractal,
     log_try_to_generate_first_stroke,
-    log_try_to_generate_stroke,
+    log_try_to_generate_following_stroke,
     log_try_to_update_stroke,
+    log_try_to_generate_stroke_pivot,
 
     log_show_2_candles,
     log_show_3_candles,
-    log_show_left_side_info_in_generating_stroke,
-    log_show_right_side_info_in_generating_stroke,
+    log_show_mobile_side_candles_in_generating_stroke,
+    log_show_fixed_side_candles_in_generating_stroke,
 
-    log_failed_in_not_enough_merged_candles,
+    log_not_enough_merged_candles,
 
     log_test_result_distance,
     log_test_result_fractal,
@@ -121,7 +120,7 @@ def generate_merged_candles_with_dataframe(df: pd.DataFrame,
         if old_candle_right is None or new_candle.id != old_candle_right.id:
             log_event_candle_generated(
                 log_level=log_level,
-                new_merged_candle=new_candle
+                new_element=new_candle
             )
 
             merged_candles.append(new_candle)
@@ -322,7 +321,7 @@ def generate_fractals(merged_candles: List[MergedCandle],
         log_try_to_generate_fractal(log_level=log_level)
 
         if idx < 3:
-            log_failed_in_not_enough_merged_candles(
+            log_not_enough_merged_candles(
                 log_level=log_level,
                 count=idx + 1,
                 required=3
@@ -354,7 +353,7 @@ def generate_fractals(merged_candles: List[MergedCandle],
             fractals.append(new_fractal)
             log_event_fractal_generated(
                 log_level=log_level,
-                new_fractal=new_fractal
+                new_element=new_fractal
             )
 
     return fractals
@@ -388,12 +387,12 @@ def generate_strokes(merged_candles: List[MergedCandle],
     minimum_distance: int = 4 if strict_mode else 3
     strokes: List[Stroke] = []
 
-    # Loop.
+    # Start loop.
     for idx in range(count):
         # Log new turn.
         log_event_new_turn(log_level, idx, count)
 
-        # 如果 strokes 列表的长度 == 0，尝试生成首个笔。
+        # 如果 strokes 列表的长度 == 0，尝试生成首根笔。
         if len(strokes) == 0:
             # log trying.
             log_try_to_generate_first_stroke(log_level=log_level)
@@ -401,7 +400,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
             # Required.
             required: int = 5
             if idx < required - 1:
-                log_failed_in_not_enough_merged_candles(
+                log_not_enough_merged_candles(
                     log_level=log_level,
                     count=idx + 1,
                     required=required
@@ -417,7 +416,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
                 right_candle=None
             )
 
-            log_show_right_side_info_in_generating_stroke(
+            log_show_fixed_side_candles_in_generating_stroke(
                 log_level=log_level,
                 left_candle=last_left_candle,
                 middle_candle=last_middle_candle,
@@ -442,7 +441,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
                     right_candle = merged_candles[i]
 
                 # Log left side candles.
-                log_show_left_side_info_in_generating_stroke(
+                log_show_mobile_side_candles_in_generating_stroke(
                     log_level=log_level,
                     left_candle=left_candle,
                     middle_candle=middle_candle,
@@ -456,7 +455,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
                 log_test_result_distance(
                     log_level=log_level,
                     distance=distance,
-                    minimum_distance=minimum_distance
+                    distance_required=minimum_distance
                 )
 
                 if distance < minimum_distance:
@@ -533,7 +532,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
 
                 log_event_stroke_generated(
                     log_level=log_level,
-                    new_stroke=new_stroke
+                    new_element=new_stroke
                 )
                 break
 
@@ -594,7 +593,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
             left_side_fractal_pattern = FractalPattern.Bottom
 
         # log trying.
-        log_try_to_generate_stroke(
+        log_try_to_generate_following_stroke(
             log_level=log_level,
             stroke=last_stroke,
             candle=last_candle
@@ -617,7 +616,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
         log_test_result_distance(
             log_level=log_level,
             distance=distance,
-            minimum_distance=minimum_distance
+            distance_required=minimum_distance
         )
 
         # If failed in distance test, exit the loop.
@@ -653,7 +652,7 @@ def generate_strokes(merged_candles: List[MergedCandle],
         strokes.append(new_stroke)
         log_event_stroke_generated(
             log_level=log_level,
-            new_stroke=new_stroke
+            new_element=new_stroke
         )
 
     return strokes
@@ -713,7 +712,7 @@ def generate_segments(strokes: List[Stroke],
 
                 log_event_segment_generated(
                     log_level=log_level,
-                    new_segment=new_segment
+                    new_element=new_segment
                 )
 
         # 如果 线段的数量 > 0：
@@ -827,7 +826,7 @@ def generate_segments(strokes: List[Stroke],
 
                     log_event_segment_generated(
                         log_level=log_level,
-                        new_segment=new_segment
+                        new_element=new_segment
                     )
 
                     continue

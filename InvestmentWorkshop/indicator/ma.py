@@ -8,7 +8,9 @@ from typing import Sequence
 import pandas as pd
 
 
-def ma(df: pd.DataFrame, parameters: Sequence[int] = (5, 10, 20, 60, 120)) -> pd.DataFrame:
+def ma(df: pd.DataFrame,
+       parameters: Sequence[int] = (5, 10, 20, 30, 60, 120)
+       ) -> pd.DataFrame:
     """
     Indicator MA (Moving Average).
 
@@ -26,7 +28,16 @@ def ma(df: pd.DataFrame, parameters: Sequence[int] = (5, 10, 20, 60, 120)) -> pd
     return result
 
 
-def ema(df: pd.DataFrame, parameters: Sequence[int]) -> pd.DataFrame:
+def ema(df: pd.DataFrame,
+        parameters: Sequence[int] = (12, 26)
+        ) -> pd.DataFrame:
+    """
+    Indicator EMA (Exponential Moving Average).
+
+    :param df:
+    :param parameters:
+    :return:
+    """
     result: pd.DataFrame = pd.DataFrame(
         columns=[f'ema{str(parameter)}' for parameter in parameters],
         index=df.index

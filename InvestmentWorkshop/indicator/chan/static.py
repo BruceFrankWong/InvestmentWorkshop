@@ -27,7 +27,7 @@ from .definition import (
 )
 from .utility import (
     is_inclusive_candle,
-    is_regular_fractal,
+    is_fractal_pattern,
     is_overlap,
     generate_merged_candle,
     generate_fractal,
@@ -51,8 +51,8 @@ from .log_message import (
     log_try_to_generate_fractal,
     log_try_to_update_fractal,
 
-    log_failed_in_not_enough_merged_candles,
-
+    log_not_enough_merged_candles,
+    log_result_price_break_test_for_update_fractal,
 )
 
 
@@ -127,7 +127,7 @@ class ChanTheoryStatic(ChanTheory):
             if old_candle_right is None or new_candle.id != old_candle_right.id:
                 log_event_candle_generated(
                     log_level=log_level,
-                    new_merged_candle=new_candle
+                    new_element=new_candle
                 )
 
                 self._merged_candles.append(new_candle)
@@ -169,7 +169,7 @@ class ChanTheoryStatic(ChanTheory):
 
                 # 如果合并K线的数量少于3个，log 信息。
                 if self.merged_candles_count < 3:
-                    log_failed_in_not_enough_merged_candles(
+                    log_not_enough_merged_candles(
                         log_level=log_level,
                         count=self.merged_candles_count,
                         required=self.minimum_distance
@@ -180,27 +180,33 @@ class ChanTheoryStatic(ChanTheory):
                 middle_candle = self._merged_candles[idx - 1]
                 right_candle = self._merged_candles[idx]
 
-
                     # left_candle,
                 #     middle_candle,
                 #     right_candle
                 # )
 
-                new_fractal = is_regular_fractal(left_candle, middle_candle, right_candle)
+                new_fractal = is_fractal_pattern(left_candle, middle_candle, right_candle)
 
                 # 是否能够形成分型。
                 if new_fractal is None:
-                    log_failed_in_not_enough_merged_candles(log_level)
+                    log_not_enough_merged_candles(
+                        log_level=log_level,
+                        count=self.merged_candles_count,
+                        required=self.minimum_distance)
                     continue
                 else:
-                    log_failed_in_not_enough_merged_candles(log_level)
+                    log_not_enough_merged_candles(
+                        log_level=log_level,
+                        count=self.merged_candles_count,
+                        required=self.minimum_distance)
 
                 # 分型是否相同。
                 # 分型的距离。
                 new_fractal = generate_fractal(
-                    left_candle,
-                    middle_candle,
-                    right_candle,
+                    left_candle=left_candle,
+                    middle_candle=middle_candle,
+                    right_candle=right_candle,
+                    candles=[],
                     last_fractal=None
                 )
 
@@ -208,10 +214,7 @@ class ChanTheoryStatic(ChanTheory):
                     self._fractals.append(new_fractal)
                     log_event_fractal_generated(
                         log_level=log_level,
-                        element_id=new_fractal.id + 1,
-                        pattern=new_fractal.pattern,
-                        mc_id=middle_candle.id,
-                        oc_id=middle_candle.ordinary_id
+                        new_element=new_fractal
                     )
                 else:
                     continue
@@ -225,33 +228,25 @@ class ChanTheoryStatic(ChanTheory):
 
                 is_updated: bool = False
 
+                log_result_price_break_test_for_update_fractal(
+                    log_level=log_level,
+                    fractal=last_fractal,
+                    candle=last_candle
+                )
                 # 如果当前合并K线顺向突破（即最高价大于顶分型中间K线的最高价，对底分型反之）。
                 if last_fractal.pattern == FractalPattern.Top:
-                    if last_candle.high < last_fractal.middle_candle.high:
-                        if verbose:
-                            print('        最新合并K线的最高价 <= 最新笔的右侧价，不满足。')
-                    else:
-                        if verbose:
-                            print('        最新合并K线的最高价 > 最新笔的右侧价，满足。')
+                    if last_candle.high >= last_fractal.middle_candle.high:
                         is_updated = True
 
                 else:  # last_fractal.pattern == FractalPattern.Bottom
-                    if last_candle.low > last_fractal.middle_candle.low:
-                        if verbose:
-                            print('        最新合并K线的最高价 >= 最新笔的右侧价，不满足。')
-                    else:
-                        if verbose:
-                            print('        最新合并K线的最高价 < 最新笔的右侧价，满足。')
+                    if last_candle.low <= last_fractal.middle_candle.low:
                         is_updated = True
 
                 if is_updated:
                     log_event_fractal_updated(
                         log_level=log_level,
-                        element_id=last_fractal.id + 1,
-                        pattern=last_fractal.pattern,
-                        extreme_price=last_fractal.extreme_price,
-                        mc_id=last_candle.id,
-                        oc_id=last_candle.ordinary_id
+                        old_fractal=last_fractal,
+                        new_candle=last_candle
                     )
 
                     # 修正前分型。

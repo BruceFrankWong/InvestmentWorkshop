@@ -20,7 +20,7 @@ import datetime as dt
 PATH_WH: Path = Path('C:\\宏源期货')
 
 PATH_WH_DATA: Path = PATH_WH.joinpath('Data')
-PATH_WH_PLOT: Path = PATH_WH.joinpath('sys', 'CustomLine')
+PATH_WH_DRAFT: Path = PATH_WH.joinpath('sys', 'CustomLine')
 PATH_WH_MARKET: Path = PATH_WH.joinpath('sys', 'MarketIni')
 
 PATH_CONTRACT_CZCE: Path = PATH_WH_MARKET.joinpath('Market2.ini')

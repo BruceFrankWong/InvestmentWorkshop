@@ -15,6 +15,8 @@ from .definition import (
     Fractal,
     Stroke,
     Segment,
+    IsolationLine,
+    Pivot,
 )
 
 
@@ -30,27 +32,29 @@ def log_event_new_turn(log_level: LogLevel,
     :param count: int. The total number of the turns. Start from 0.
     :return: 
     """
-    if log_level.value >= LogLevel.Simple.value:
-        width: int = len(str(count - 1)) + 1
-        print(f'\n【第 {idx:>{width}} / {count - 1:>{width}} 轮】')
+    if log_level.value < LogLevel.Simple.value:
+        return
+
+    width: int = len(str(count - 1)) + 1
+    print(f'\n【第 {idx:>{width}} / {count - 1:>{width}} 轮】')
 
 
 def log_event_candle_generated(log_level: LogLevel,
-                               new_merged_candle: MergedCandle
+                               new_element: MergedCandle
                                ) -> None:
     """
     Log message when a new merged candle was generated.
     
     :param log_level: 
-    :param new_merged_candle:
+    :param new_element:
     :return: 
     """
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 生成合并K线：\n    第 {new_merged_candle.id + 1} 根合并K线，'
-            f'起始id（普通K线）= {new_merged_candle.left_ordinary_id}，'
-            f'周期 = {new_merged_candle.period}，'
-            f'high = {new_merged_candle.high}，low = {new_merged_candle.low}。'
+            f'\n  ● 生成合并K线：\n    第 {new_element.id + 1} 根合并K线，'
+            f'起始id（普通K线）= {new_element.left_ordinary_id}，'
+            f'周期 = {new_element.period}，'
+            f'high = {new_element.high}，low = {new_element.low}。'
         )
 
 
@@ -67,12 +71,12 @@ def log_event_candle_updated(log_level: LogLevel,
 
 
 def log_event_fractal_generated(log_level: LogLevel,
-                                new_fractal: Fractal
+                                new_element: Fractal
                                 ) -> None:
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 生成分型：\n    第 {new_fractal.id + 1} 个分型，模式 = {new_fractal.pattern.value}，'
-            f'位置id（合并K线）= {new_fractal.merged_id}，位置id（普通K线）= {new_fractal.ordinary_id}。'
+            f'\n  ● 生成分型：\n    第 {new_element.id + 1} 个分型，模式 = {new_element.pattern.value}，'
+            f'位置id（合并K线）= {new_element.merged_id}，位置id（普通K线）= {new_element.ordinary_id}。'
         )
 
 
@@ -103,15 +107,15 @@ def log_event_fractal_dropped(log_level: LogLevel,
 
 
 def log_event_stroke_generated(log_level: LogLevel,
-                               new_stroke: Stroke
+                               new_element: Stroke
                                ) -> None:
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 生成笔：\n    第 {new_stroke.id + 1} 个笔，趋势 = {new_stroke.trend}，'
-            f'起点（合并K线 id）= {new_stroke.left_merged_id}、'
-            f'（普通K线 id）= {new_stroke.left_ordinary_id}，'
-            f'终点（合并K线 id）= {new_stroke.right_merged_id}、'
-            f'（普通K线 id）= {new_stroke.right_ordinary_id}。'
+            f'\n  ● 生成笔：\n    第 {new_element.id + 1} 个笔，趋势 = {new_element.trend}，'
+            f'起点（合并K线 id）= {new_element.left_merged_id}、'
+            f'（普通K线 id）= {new_element.left_ordinary_id}，'
+            f'终点（合并K线 id）= {new_element.right_merged_id}、'
+            f'（普通K线 id）= {new_element.right_ordinary_id}。'
         )
 
 
@@ -129,80 +133,70 @@ def log_event_stroke_updated(log_level: LogLevel,
 
 
 def log_event_segment_generated(log_level: LogLevel,
-                                new_segment: Segment
+                                new_element: Segment
                                 ):
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 生成线段：\n    第 {new_segment.id + 1} 个线段，趋势 = {new_segment.trend}，'
-            f'起点id：合并K线 = {new_segment.left_merged_id}，'
-            f'普通K线 = {new_segment.left_ordinary_id}，'
-            f'终点id：合并K线 = {new_segment.right_merged_id}，'
-            f'普通K线 = {new_segment.right_ordinary_id}，'
-            f'容纳的笔 = {new_segment.stroke_id_list}。'
+            f'\n  ● 生成线段：\n    第 {new_element.id + 1} 个线段，趋势 = {new_element.trend}，'
+            f'起点id：合并K线 = {new_element.left_merged_id}，'
+            f'普通K线 = {new_element.left_ordinary_id}，'
+            f'终点id：合并K线 = {new_element.right_merged_id}，'
+            f'普通K线 = {new_element.right_ordinary_id}，'
+            f'构成该线段的笔 = {new_element.stroke_id_list}。'
         )
 
 
 def log_event_segment_extended(log_level: LogLevel,
-                               element_id: int,
-                               trend: Trend,
-                               old_mc_id: int,
-                               new_mc_id: int,
-                               old_oc_id: int,
-                               new_oc_id: int
+                               element: Segment,
+                               stroke: Stroke
                                ):
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 延伸线段：\n    第 {element_id} 个线段，趋势 = {trend}，'
-            f'原终点id（合并K线）= {old_mc_id}，现终点id（合并K线）= {new_mc_id}，'
-            f'原终点id（普通K线）= {old_oc_id}，现终点id（普通K线）= {new_oc_id}。'
+            f'\n  ● 延伸线段：\n    第 {element.id + 1} 个线段，趋势 = {element.trend}，'
+            f'原终点id 合并K线= {element.right_merged_id}，'
+            f'普通K线= {element.right_ordinary_id}，'
+            f'现终点id 合并K线= {stroke.right_ordinary_id}，'
+            f'普通K线= {stroke.right_ordinary_id}。'
         )
 
 
 def log_event_segment_expanded(log_level: LogLevel,
-                               element_id: int,
-                               trend: Trend,
-                               old_mc_id: int,
-                               new_mc_id: int,
-                               old_oc_id: int,
-                               new_oc_id: int,
-                               strokes_changed: List[int]
+                               element: Segment,
+                               stroke: Stroke,
+                               new_strokes: List[int]
                                ):
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 扩展线段：\n    第 {element_id} 个线段，趋势 = {trend}，'
-            f'原终点id（合并K线）= {old_mc_id}，现终点id（合并K线）= {new_mc_id}，'
-            f'原终点id（普通K线）= {old_oc_id}，现终点id（普通K线）= {new_oc_id}，'
-            f'新增笔 = {strokes_changed}。'
+            f'\n  ● 扩展线段：\n    第 {element.id + 1} 个线段，趋势 = {element.trend}，'
+            f'原终点id 合并K线 = {element.right_merged_id}，'
+            f'普通K线 = {element.right_ordinary_id}，'
+            f'现终点id 合并K线 = {stroke.right_merged_id}，'
+            f'普通K线 = {stroke.right_ordinary_id}，'
+            f'新增笔 = {new_strokes}。'
         )
 
 
 def log_event_isolation_line_generated(log_level: LogLevel,
-                                       element_id: int,
-                                       mc_id: int,
-                                       oc_id: int
-                                       ):
+                                       new_element: IsolationLine
+                                       ) -> None:
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 生成同级别分解线：\n    第 {element_id} 个同级别分解线，'
-            f'位置（合并K线） = {mc_id}，位置（普通K线） = {oc_id}。'
+            f'\n  ● 生成同级别分解线：\n    第 {new_element.id + 1} 个同级别分解线，'
+            f'位置（合并K线） = {new_element.merged_id}，位置（普通K线） = {new_element.ordinary_id}。'
         )
 
 
 def log_event_stroke_pivot_generated(log_level: LogLevel,
-                                     element_id: int,
-                                     left_mc_id: int,
-                                     right_mc_id: int,
-                                     left_oc_id: int,
-                                     right_oc_id: int,
-                                     high: float,
-                                     low: float
+                                     new_element: Pivot
                                      ):
     if log_level.value >= LogLevel.Normal.value:
         print(
-            f'\n  ● 生成笔中枢：\n    第 {element_id} 个笔中枢，'
-            f'起点id（合并K线） = {left_mc_id}，终点id（合并K线） = {right_mc_id}，'
-            f'起点id（普通K线） = {left_oc_id}，终点id（普通K线） = {right_oc_id}，'
-            f'high = {high}，low = {low}。'
+            f'\n  ● 生成笔中枢：\n    第 {new_element.id + 1} 个笔中枢，'
+            f'起点id 合并K线 = {new_element.left_merged_id}，'
+            f'普通K线 = {new_element.left_ordinary_id}，'
+            f'终点id 合并K线 = {new_element.right_merged_id}，'
+            f'普通K线 = {new_element.right_ordinary_id}，'
+            f'high = {new_element.high}，low = {new_element.low}。'
         )
 
 
@@ -247,9 +241,9 @@ def log_try_to_generate_first_stroke(log_level: LogLevel) -> None:
         print('\n  ○ 尝试生成笔：')
 
 
-def log_try_to_generate_stroke(log_level: LogLevel,
-                               stroke: Stroke,
-                               candle: MergedCandle) -> None:
+def log_try_to_generate_following_stroke(log_level: LogLevel,
+                                         stroke: Stroke,
+                                         candle: MergedCandle) -> None:
     if log_level.value >= LogLevel.Detailed.value:
         print(
             f'\n  ○ 尝试生成后续笔：'
@@ -265,9 +259,14 @@ def log_try_to_update_stroke(log_level: LogLevel) -> None:
         print('\n  ○ 尝试修正笔：')
 
 
-def log_try_to_generate_segment(log_level: LogLevel) -> None:
+def log_try_to_generate_first_segment(log_level: LogLevel) -> None:
     if log_level.value >= LogLevel.Detailed.value:
-        print('\n  ○ 尝试生成线段：')
+        print('\n  ○ 尝试生成首根线段：')
+
+
+def log_try_to_generate_following_segment(log_level: LogLevel) -> None:
+    if log_level.value >= LogLevel.Detailed.value:
+        print('\n  ○ 尝试生成后续线段：')
 
 
 def log_try_to_generate_isolation_line(log_level: LogLevel) -> None:
@@ -321,13 +320,16 @@ def log_show_3_candles(log_level: LogLevel,
         )
 
 
-def log_show_left_side_info_in_generating_stroke(log_level: LogLevel,
-                                                 left_candle: Optional[MergedCandle],
-                                                 middle_candle: MergedCandle,
-                                                 right_candle: MergedCandle
-                                                 ) -> None:
+def log_show_mobile_side_candles_in_generating_stroke(log_level: LogLevel,
+                                                      left_candle: Optional[MergedCandle],
+                                                      middle_candle: MergedCandle,
+                                                      right_candle: Optional[MergedCandle]
+                                                      ) -> None:
+    if left_candle is None and right_candle is None:
+        raise ValueError('only one of <left_candle> and <right_candle> can not be None.')
+
     if log_level.value >= LogLevel.Detailed.value:
-        print(f'    左侧：')
+        print(f'    移动端：')
         if left_candle is None:
             print(
                 f'        合并K线1 id（合并K线）= {middle_candle.id}，'
@@ -336,6 +338,15 @@ def log_show_left_side_info_in_generating_stroke(log_level: LogLevel,
                 f'        合并K线2 id（合并K线）= {right_candle.id}，'
                 f'id（普通K线）= {right_candle.ordinary_id}，'
                 f'最高价 = {right_candle.high}，最低价 = {right_candle.low}'
+            )
+        elif right_candle is None:
+            print(
+                f'        合并K线1 id（合并K线）= {left_candle.id}，'
+                f'id（普通K线）= {left_candle.ordinary_id}，'
+                f'最高价 = {left_candle.high}，最低价 = {left_candle.low}\n'
+                f'        合并K线2 id（合并K线）= {middle_candle.id}，'
+                f'id（普通K线）= {middle_candle.ordinary_id}，'
+                f'最高价 = {middle_candle.high}，最低价 = {middle_candle.low}'
             )
         else:
             print(
@@ -351,14 +362,14 @@ def log_show_left_side_info_in_generating_stroke(log_level: LogLevel,
             )
 
 
-def log_show_right_side_info_in_generating_stroke(log_level: LogLevel,
-                                                  left_candle: MergedCandle,
-                                                  middle_candle: MergedCandle,
-                                                  fractal_pattern: Optional[FractalPattern]
-                                                  ) -> None:
+def log_show_fixed_side_candles_in_generating_stroke(log_level: LogLevel,
+                                                     left_candle: MergedCandle,
+                                                     middle_candle: MergedCandle,
+                                                     fractal_pattern: Optional[FractalPattern]
+                                                     ) -> None:
     if log_level.value >= LogLevel.Detailed.value:
         print(
-            f'    右侧：\n'
+            f'    固定端（右侧）：\n'
             f'        最新合并K线 id（合并K线）= {left_candle.id}，'
             f'id（普通K线）= {left_candle.ordinary_id}，'
             f'最高价 = {left_candle.high}，最低价 = {left_candle.low}\n'
@@ -372,6 +383,20 @@ def log_show_right_side_info_in_generating_stroke(log_level: LogLevel,
             print(f'        分型 pattern = {fractal_pattern.value}。')
 
 
+def log_show_fixed_side_pattern_in_generating_stroke(log_level: LogLevel,
+                                                     middle_candle: MergedCandle,
+                                                     fractal_pattern: FractalPattern
+                                                     ) -> None:
+    if log_level.value >= LogLevel.Detailed.value:
+        print(
+            f'    固定端（左侧）：\n'
+            f'        关键合并K线 id（合并K线）= {middle_candle.id}，'
+            f'id（普通K线）= {middle_candle.ordinary_id}，'
+            f'最高价 = {middle_candle.high}，最低价 = {middle_candle.low}。\n'
+            f'        分型 pattern = {fractal_pattern.value}。'
+        )
+
+
 def log_not_enough_merged_candles(log_level: LogLevel,
                                   count: int,
                                   required: int
@@ -382,19 +407,19 @@ def log_not_enough_merged_candles(log_level: LogLevel,
 
 def log_test_result_distance(log_level: LogLevel,
                              distance: int,
-                             minimum_distance: int
+                             distance_required: int
                              ) -> None:
     if log_level.value >= LogLevel.Detailed.value:
-        print('      测试是否满足最小距离要求：')
-        if distance >= minimum_distance:
+        print('      测试：是否满足最小距离要求。')
+        if distance >= distance_required:
             print(
                 f'          通过。\n'
-                f'              两个分型之间的距离 = {distance}，>= 最小距离要求（{minimum_distance}）。'
+                f'              两个分型之间的距离 = {distance}，>= 最小距离要求（{distance_required}）。'
             )
         else:
             print(
                 f'          不通过。\n'
-                f'              两个分型之间的距离 = {distance}，< 最小距离要求（{minimum_distance}）。'
+                f'              两个分型之间的距离 = {distance}，< 最小距离要求（{distance_required}）。'
             )
 
 
@@ -402,7 +427,7 @@ def log_test_result_fractal(log_level: LogLevel,
                             fractal_pattern: Optional[FractalPattern]
                             ) -> None:
     if log_level.value >= LogLevel.Detailed.value:
-        print('      测试是否能够构成分型：')
+        print('      测试：是否能够构成分型。')
         if fractal_pattern is None:
             print(
                 f'          不通过。\n'
@@ -420,7 +445,7 @@ def log_test_result_fractal_pattern(log_level: LogLevel,
                                     right_fractal_pattern: FractalPattern,
                                     ) -> None:
     if log_level.value >= LogLevel.Detailed.value:
-        print('      测试两个分型的类型是否不同：')
+        print('      测试：是否两个分型的类型不同。')
         if left_fractal_pattern == right_fractal_pattern:
             print(
                 f'          不通过。\n'
@@ -445,7 +470,7 @@ def log_test_result_price_range(log_level: LogLevel,
                                 candle: MergedCandle
                                 ) -> None:
     if log_level.value >= LogLevel.Detailed.value:
-        print('      测试两个分型的类型是否不同：')
+        print('      测试：是否两个分型之间的价格没有达到或突破分型的极值价。')
         if break_high is False and break_low is False:
             print(
                 f'          通过。\n'
@@ -492,6 +517,36 @@ def log_test_result_price_break(log_level: LogLevel,
                 print(
                     f'        不通过。\n'
                     f'            最新合并K线的最低价 > 最新笔的右侧价。'
+                )
+
+
+def log_result_price_break_test_for_update_fractal(log_level: LogLevel,
+                                                   fractal: Fractal,
+                                                   candle: MergedCandle
+                                                   ) -> None:
+    if log_level.value >= LogLevel.Detailed.value:
+        print('    测试合并K线的价格是否达到或突破分型的极值价：')
+        if fractal.pattern == FractalPattern.Top:
+            if candle.high >= fractal.extreme_price:
+                print(
+                    f'        通过。\n'
+                    f'            最新合并K线的最高价 >= 最新分型的极值价。'
+                )
+            else:
+                print(
+                    f'        不通过。\n'
+                    f'            最新合并K线的最高价 < 最新分型的极值价。'
+                )
+        else:
+            if candle.low <= fractal.extreme_price:
+                print(
+                    f'        通过。\n'
+                    f'            最新合并K线的最低价 <= 最新分型的极值价。'
+                )
+            else:
+                print(
+                    f'        不通过。\n'
+                    f'            最新合并K线的最低价 > 最新分型的极值价。'
                 )
 
 

@@ -10,6 +10,8 @@ from .ma import (
 from .pbx import pbx
 from .boll import boll
 from .chan import (
+    MergedCandle,
+
     ChanTheory,
     ChanTheoryStatic,
     ChanTheoryDynamic,

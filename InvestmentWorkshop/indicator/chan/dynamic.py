@@ -16,7 +16,6 @@ from .definition import (
     Action,
     LogLevel,
 
-    FirstOrLast,
     FractalPattern,
     Trend,
     OrdinaryCandle,
@@ -46,14 +45,17 @@ from .log_message import (
     log_event_stroke_pivot_extended,
 
     log_try_to_generate_first_stroke,
-    log_try_to_generate_stroke,
+    log_try_to_generate_following_stroke,
     log_try_to_update_stroke,
+    log_try_to_generate_first_segment,
+    log_try_to_generate_stroke_pivot,
+    log_try_to_generate_isolation_line,
     log_show_2_candles,
     log_show_3_candles,
 
-    log_failed_in_not_enough_merged_candles,
-    log_show_right_side_info_in_generating_stroke,
-    log_show_left_side_info_in_generating_stroke,
+    log_not_enough_merged_candles,
+    log_show_fixed_side_candles_in_generating_stroke,
+    log_show_mobile_side_candles_in_generating_stroke,
     log_test_result_distance,
     log_test_result_fractal,
     log_test_result_fractal_pattern,
@@ -62,8 +64,6 @@ from .log_message import (
 )
 from .utility import (
     is_fractal_pattern,
-    is_regular_fractal,
-    is_potential_fractal,
     generate_merged_candle,
 )
 
@@ -112,10 +112,20 @@ class ChanTheoryDynamic(ChanTheory):
         :param strict_mode:
         :param log_level:
         """
-        super().__init__(strict_mode, log_level)
+        super().__init__(
+            strict_mode=strict_mode,
+            log_level=log_level
+        )
 
-    def get_ordinary_candle_id(self, merged_candle_id: int) -> Optional[int]:
-        return self._merged_candles[merged_candle_id].right_ordinary_id
+    def get_ordinary_candle_id(self,
+                               merged_candle_id: int
+                               ) -> Optional[int]:
+        if merged_candle_id < 0:
+            raise ValueError('<merged_candle_id> should be positive integer.')
+        elif 0 <= merged_candle_id <= self.merged_candles_count:
+            return self._merged_candles[merged_candle_id].right_ordinary_id
+        else:
+            return None
 
     def update_merged_candle(self,
                              ordinary_candle: OrdinaryCandle,
@@ -155,7 +165,7 @@ class ChanTheoryDynamic(ChanTheory):
         if old_candle_right is None or new_candle.id != old_candle_right.id:
             log_event_candle_generated(
                 log_level=log_level,
-                new_merged_candle=new_candle
+                new_element=new_candle
             )
 
             self._merged_candles.append(new_candle)
@@ -179,13 +189,16 @@ class ChanTheoryDynamic(ChanTheory):
         :return:
         """
 
+        if log_level is None:
+            log_level = self._log_level
+
         return Action.NothingChanged
 
     def generate_first_stroke(self,
                               log_level: Optional[LogLevel] = None
                               ) -> Action:
         """
-        生成第1个笔，同时生成第1个、第2个分型。
+        生成首根笔，同时生成第1个、第2个分型。
 
         正式分型：需要有左中右三根K线。
 
@@ -204,27 +217,29 @@ class ChanTheoryDynamic(ChanTheory):
         :return:
         """
 
+        # Handle parameters.
         if log_level is None:
             log_level = self._log_level
 
+        # log trying.
+        log_try_to_generate_first_stroke(log_level=log_level)
+
+        # Parameters validation.
         if self.merged_candles_count == 0:
             raise RuntimeError(
                 'No merged candle data, run <generate_merged_candles_with_dataframe> before.'
             )
 
-        # log trying.
-        log_try_to_generate_first_stroke(log_level=log_level)
-
         # log "not enough merged candles".
         if self.merged_candles_count < self.minimum_distance:
-            log_failed_in_not_enough_merged_candles(
+            log_not_enough_merged_candles(
                 log_level=log_level,
                 count=self.merged_candles_count,
                 required=self.minimum_distance
             )
             return Action.NothingChanged
 
-        # Declare variables。
+        # Declare right side variables.
         right_side_candle_left: MergedCandle = self._merged_candles[-2]
         right_side_candle_middle: MergedCandle = self._merged_candles[-1]
         right_fractal_pattern: Optional[FractalPattern] = is_fractal_pattern(
@@ -233,20 +248,20 @@ class ChanTheoryDynamic(ChanTheory):
             right_candle=None
         )
 
-        log_show_right_side_info_in_generating_stroke(
+        log_show_fixed_side_candles_in_generating_stroke(
             log_level=log_level,
             left_candle=right_side_candle_left,
             middle_candle=right_side_candle_middle,
             fractal_pattern=right_fractal_pattern
         )
 
-        # 申明变量类型并赋值。
+        # Declare left side variables.
         left_side_candle_left: Optional[MergedCandle]
         left_side_candle_middle: MergedCandle
         left_side_candle_right: MergedCandle
         left_fractal_pattern: FractalPattern
 
-        # 开始循环。
+        # Start loop.
         for i in range(1, right_side_candle_middle.id):
 
             # Get left side candles.
@@ -260,7 +275,7 @@ class ChanTheoryDynamic(ChanTheory):
                 left_side_candle_right = self._merged_candles[i]
 
             # Log left side candles.
-            log_show_left_side_info_in_generating_stroke(
+            log_show_mobile_side_candles_in_generating_stroke(
                 log_level=log_level,
                 left_candle=left_side_candle_left,
                 middle_candle=left_side_candle_middle,
@@ -274,7 +289,7 @@ class ChanTheoryDynamic(ChanTheory):
             log_test_result_distance(
                 log_level=log_level,
                 distance=distance,
-                minimum_distance=self.minimum_distance
+                distance_required=self.minimum_distance
             )
 
             # 如果测试未通过，进入下一次合并K线循环。
@@ -346,7 +361,7 @@ class ChanTheoryDynamic(ChanTheory):
             if is_price_break_high or is_price_break_low:
                 continue
 
-            # 创建首对分型
+            # Generate the first pair of fractals.
             new_fractal: Fractal = Fractal(
                 id=self.fractals_count,
                 pattern=left_fractal_pattern,
@@ -358,7 +373,7 @@ class ChanTheoryDynamic(ChanTheory):
             self._fractals.append(new_fractal)
             log_event_fractal_generated(
                 log_level=log_level,
-                new_fractal=new_fractal
+                new_element=new_fractal
             )
 
             new_fractal: Fractal = Fractal(
@@ -372,9 +387,10 @@ class ChanTheoryDynamic(ChanTheory):
             self._fractals.append(new_fractal)
             log_event_fractal_generated(
                 log_level=log_level,
-                new_fractal=new_fractal
+                new_element=new_fractal
             )
 
+            # Generate the first stroke.
             new_stroke: Stroke = Stroke(
                 id=self.strokes_count,
                 trend=Trend.Bullish if left_fractal_pattern == FractalPattern.Bottom
@@ -385,76 +401,12 @@ class ChanTheoryDynamic(ChanTheory):
             self._strokes.append(new_stroke)
             log_event_stroke_generated(
                 log_level=log_level,
-                new_stroke=new_stroke
+                new_element=new_stroke
             )
 
             return Action.StrokeGenerated
 
         return Action.NothingChanged
-
-    def extend_stroke(self,
-                      log_level: LogLevel = LogLevel.Normal
-                      ) -> Action:
-        """
-        延伸笔，同时修正分型。
-
-        如果：
-            A1. 最新笔是上升笔：
-            A2. 最新合并K线的 最高价 >= 最新笔的 右侧价 （顺向超越或达到）：
-          或
-            B1. 最新笔是下降笔：
-            B2. 最新合并K线的 最低价 <= 最新笔的 右侧价 （顺向超越或达到）：
-        修正最新分型为潜在，向右侧移动，并且延伸笔。
-        否则，修正分型为正式分型。
-        :return:
-        """
-
-        # 申明变量类型并赋值。
-        last_stroke: Stroke = self._strokes[-1]
-        last_fractal: Fractal = self._fractals[-1]
-        last_candle: MergedCandle = self._merged_candles[-1]
-        is_updated: bool = False
-
-        # log trying.
-        log_try_to_update_stroke(log_level=log_level)
-
-        if last_stroke.trend == Trend.Bullish:
-            if last_candle.high >= last_stroke.right_price:
-                is_updated = True
-
-        else:  # last_stroke.trend == Trend.Bearish
-            if last_candle.low <= last_stroke.right_price:
-                is_updated = True
-
-        log_test_result_price_break(
-            log_level=log_level,
-            stroke=last_stroke,
-            candle=last_candle
-        )
-
-        if is_updated is False:
-            return Action.NothingChanged
-
-        # 修正分型。
-        last_fractal.left_candle = last_fractal.middle_candle
-        last_fractal.middle_candle = last_candle
-
-        log_event_fractal_updated(
-            log_level=log_level,
-            old_fractal=last_fractal,
-            new_candle=last_candle
-        )
-
-        # 延伸笔。
-        last_stroke.right_candle = last_candle
-
-        log_event_stroke_updated(
-            log_level=log_level,
-            old_stroke=last_stroke,
-            new_candle=last_candle
-        )
-
-        return Action.StrokeExtended
 
     def generate_following_stroke(self,
                                   log_level: LogLevel = LogLevel.Normal
@@ -475,52 +427,58 @@ class ChanTheoryDynamic(ChanTheory):
         :return:
         """
 
-        # 申明变量类型并赋值。
+        # Handle parameter <log_level>.
+        if log_level is None:
+            log_level = self._log_level
+
+        # Declare variables and assign value.
         last_candle: MergedCandle = self._merged_candles[-1]
         last_stroke: Stroke = self._strokes[-1]
 
         # log trying.
-        log_try_to_generate_stroke(
+        log_try_to_generate_following_stroke(
             log_level=log_level,
             stroke=last_stroke,
             candle=last_candle
         )
 
-        # 判定距离。
+        # Test: distance should be equal to or larger than the minimum distance.
         distance = last_candle.id - last_stroke.right_candle.id
-        if distance < self._minimum_distance:
-            if log_level.value >= LogLevel.Detailed.value:
-                print(f'        距离 = {distance}，< {self._minimum_distance}，不满足。')
-            return Action.NothingChanged
-        else:
-            if log_level.value >= LogLevel.Detailed.value:
-                print(f'        距离 = {distance}，≥ {self._minimum_distance}，满足。')
 
-        # 判定潜在分型。
+        log_test_result_distance(
+            log_level=log_level,
+            distance=distance,
+            distance_required=self.minimum_distance
+        )
+
+        if distance < self.minimum_distance:
+            return Action.NothingChanged
+
+        # Test: patterns of the two fractals should be different.
         left_fractal_pattern: FractalPattern
         if last_stroke.trend == Trend.Bullish:
             left_fractal_pattern = FractalPattern.Top
         else:
             left_fractal_pattern = FractalPattern.Bottom
 
-        right_fractal_pattern: FractalPattern
-        _, right_fractal_pattern = is_potential_fractal(
-            [self._merged_candles[-2], last_candle],
-            FirstOrLast.Last
+        right_fractal_pattern: FractalPattern = is_fractal_pattern(
+            left_candle=self._merged_candles[-2],
+            middle_candle=self._merged_candles[-1],
+            right_candle=None
         )
-        if right_fractal_pattern == left_fractal_pattern:
-            if log_level.value >= LogLevel.Detailed.value:
-                print(
-                    f'        潜在分型 = {right_fractal_pattern.value}，与最新笔的右侧分型相同，不满足。'
-                )
-            return Action.NothingChanged
-        else:
-            if log_level.value >= LogLevel.Detailed.value:
-                print(
-                    f'        潜在分型 = {right_fractal_pattern.value}，与最新笔的右侧分型不同，满足。'
-                )
 
-        # 判定两端分型的中间K线。
+        log_test_result_fractal_pattern(
+            log_level=log_level,
+            left_fractal_pattern=left_fractal_pattern,
+            right_fractal_pattern=right_fractal_pattern
+        )
+
+        if right_fractal_pattern == left_fractal_pattern:
+            return Action.NothingChanged
+
+        # Test:
+        # price of candles between the two fractals should
+        # not reach or beyond the extreme price of the fractals.
         price_low: float
         price_high: float
         if last_stroke.trend == Trend.Bullish:
@@ -530,52 +488,32 @@ class ChanTheoryDynamic(ChanTheory):
             price_low = last_stroke.right_price
             price_high = last_candle.high
 
-        candle: MergedCandle
+        cursor_candle: MergedCandle
+        result_candle: Optional[MergedCandle] = None
+        is_price_break_high: bool = False
+        is_price_break_low: bool = False
         for j in range(last_stroke.right_merged_id + 1, last_candle.id):
-            candle = self.merged_candles[j]
-            if candle.low < price_low:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print(
-                        f'        第 {j} 个合并K线的最低价 = {candle.low}，'
-                        f'超越了两个分型的最低价 {price_low}，不满足。'
-                    )
-                return Action.NothingChanged
-            if candle.high > price_high:
-                if log_level.value >= LogLevel.Detailed.value:
-                    print(
-                        f'        第 {j} 个合并K线的最高价 = {candle.high}，'
-                        f'超越了两个分型的最低价 {price_high}，不满足。'
-                    )
-                return Action.NothingChanged
-        if log_level.value >= LogLevel.Detailed.value:
-            print(
-                f'        中间合并K线的最高价或者最低价没有超越两个分型的极值，满足。'
-            )
+            cursor_candle = self.merged_candles[j]
+            if cursor_candle.low < price_low:
+                is_price_break_low = True
+                result_candle = cursor_candle
+                break
+            if cursor_candle.high > price_high:
+                is_price_break_high = True
+                result_candle = cursor_candle
+                break
 
-        # 确认旧的分型。
-        self._fractals[-1].is_confirmed = True
-
-        # 生成新的分型。
-        new_fractal: Fractal = Fractal(
-            id=self.fractals_count,
-            pattern=right_fractal_pattern,
-            left_candle=self._merged_candles[-2],
-            middle_candle=last_candle,
-            right_candle=None,
-            is_confirmed=False
+        log_test_result_price_range(
+            log_level=log_level,
+            break_high=is_price_break_high,
+            break_low=is_price_break_low,
+            candle=result_candle
         )
-        if self._log:
-            print(
-                LOG_FRACTAL_GENERATED.format(
-                    id=new_fractal.id + 1,
-                    pattern=new_fractal.pattern,
-                    mc_id=new_fractal.merged_id,
-                    oc_id=new_fractal.ordinary_id
-                )
-            )
-        self._fractals.append(new_fractal)
 
-        # 生成新的笔。
+        if is_price_break_high or is_price_break_low:
+            return Action.NothingChanged
+
+        # Generate new stroke.
         new_stroke: Stroke = Stroke(
             id=self.strokes_count,
             trend=Trend.Bullish if last_stroke.trend == Trend.Bearish
@@ -583,26 +521,94 @@ class ChanTheoryDynamic(ChanTheory):
             left_candle=last_stroke.right_candle,
             right_candle=last_candle,
         )
-        if self._log:
-            print(
-                LOG_STROKE_GENERATED.format(
-                    id=new_stroke.id + 1,
-                    trend=new_stroke.trend,
-                    left_mc_id=new_stroke.left_candle.id,
-                    right_mc_id=new_stroke.right_candle.id,
-                    left_oc_id=new_stroke.left_candle.ordinary_id,
-                    right_oc_id=new_stroke.right_candle.ordinary_id
-                )
-            )
+
         self._strokes.append(new_stroke)
+
+        log_event_stroke_generated(
+            log_level=log_level,
+            new_element=new_stroke
+        )
 
         return Action.StrokeGenerated
 
-    def generate_first_segment(self) -> Action:
+    def extend_stroke(self,
+                      log_level: LogLevel = LogLevel.Normal
+                      ) -> Action:
+        """
+        延伸笔，同时修正分型。
+
+        如果：
+            A1. 最新笔是上升笔：
+            A2. 最新合并K线的 最高价 >= 最新笔的 右侧价 （顺向超越或达到）：
+          或
+            B1. 最新笔是下降笔：
+            B2. 最新合并K线的 最低价 <= 最新笔的 右侧价 （顺向超越或达到）：
+        修正最新分型为潜在，向右侧移动，并且延伸笔。
+        否则，修正分型为正式分型。
+        :return:
+        """
+        # Handle parameter <log_level>.
+        if log_level is None:
+            log_level = self._log_level
+
+        # Declare variables and assign value.
+        last_stroke: Stroke = self._strokes[-1]
+        last_candle: MergedCandle = self._merged_candles[-1]
+        is_updated: bool = False
+
+        # log trying.
+        log_try_to_update_stroke(log_level=log_level)
+
+        # Test:
+        # price of last candle reach or beyond the extreme price of the last fractal.
+        if last_stroke.trend == Trend.Bullish:
+            if last_candle.high >= last_stroke.right_price:
+                is_updated = True
+
+        else:  # last_stroke.trend == Trend.Bearish
+            if last_candle.low <= last_stroke.right_price:
+                is_updated = True
+
+        log_test_result_price_break(
+            log_level=log_level,
+            stroke=last_stroke,
+            candle=last_candle
+        )
+
+        if is_updated is False:
+            return Action.NothingChanged
+
+        # Extend stroke.
+        last_stroke.right_candle = last_candle
+
+        log_event_stroke_updated(
+            log_level=log_level,
+            old_stroke=last_stroke,
+            new_candle=last_candle
+        )
+
+        return Action.StrokeExtended
+
+    def generate_first_segment(self,
+                               log_level: LogLevel = LogLevel.Normal
+                               ) -> Action:
         """
         Generate the first segments.
         :return: None.
         """
+        # Handle parameter <log_level>.
+        if log_level is None:
+            log_level = self._log_level
+
+        # log trying.
+        log_try_to_generate_first_segment(log_level=log_level)
+
+        # Parameters validation.
+        if self.strokes_count == 0:
+            raise RuntimeError(
+                'No stroke data, run <generate_strokes> before this method.'
+            )
+
         # 如果 笔数量 < 3： 退出。
         if self.strokes_count < 3:
             if log_level.value >= LogLevel.Detailed.value:
@@ -611,7 +617,7 @@ class ChanTheoryDynamic(ChanTheory):
                 )
             return Action.NothingChanged
 
-        # 申明变量类型并赋值。
+        # Declare variables and assign value.
         right_stroke: Stroke = self._strokes[-1]    # 右侧笔
         middle_stroke: Stroke = self._strokes[-2]   # 中间笔
         left_stroke: Stroke = self._strokes[-3]     # 左侧笔
@@ -704,22 +710,16 @@ class ChanTheoryDynamic(ChanTheory):
         )
         self._segments.append(new_segment)
 
-        if self._log:
-            print(
-                LOG_SEGMENT_GENERATED.format(
-                    id=new_segment.id + 1,
-                    trend=new_segment.trend,
-                    left_mc_id=new_segment.left_merged_id,
-                    right_mc_id=new_segment.right_merged_id,
-                    left_oc_id=new_segment.left_ordinary_id,
-                    right_oc_id=new_segment.right_ordinary_id,
-                    strokes=new_segment.stroke_id_list
-                )
-            )
+        log_event_segment_generated(
+            log_level=log_level,
+            new_element=new_segment
+        )
 
         return Action.SegmentGenerated
 
-    def extend_segment(self) -> Action:
+    def extend_segment(self,
+                       log_level: LogLevel = LogLevel.Normal
+                       ) -> Action:
         """
         Extend an existed segment.
 
@@ -791,17 +791,11 @@ class ChanTheoryDynamic(ChanTheory):
             if log_level.value >= LogLevel.Detailed.value:
                 print(verbose_message['pass'])
 
-            if self._log:
-                print(
-                    LOG_SEGMENT_EXTENDED.format(
-                        id=last_segment.id + 1,
-                        trend=last_segment.trend,
-                        old_mc_id=last_segment.right_candle.id,
-                        new_mc_id=last_stroke.right_candle.id,
-                        old_oc_id=last_segment.right_ordinary_id,
-                        new_oc_id=last_stroke.right_ordinary_id
-                    )
-                )
+            log_event_segment_extended(
+                log_level=log_level,
+                element=last_segment,
+                stroke=last_stroke
+            )
 
             last_segment.right_candle = last_stroke.right_candle
 
@@ -809,7 +803,9 @@ class ChanTheoryDynamic(ChanTheory):
 
         return Action.NothingChanged
 
-    def expand_segment(self) -> Action:
+    def expand_segment(self,
+                       log_level: Optional[LogLevel] = None
+                       ) -> Action:
         """
         Expand an existed segment.
 
@@ -836,6 +832,10 @@ class ChanTheoryDynamic(ChanTheory):
             'achieve_or_beyond':
                 '        最新笔的右侧价 达到或超越 线段的右侧价，满足。',
         }
+
+        # Handle parameters.
+        if log_level is None:
+            log_level = self._log_level
 
         # 申明变量类型并赋值。
         last_segment: Segment = self._segments[-1]
@@ -884,23 +884,17 @@ class ChanTheoryDynamic(ChanTheory):
             if log_level.value >= LogLevel.Detailed.value:
                 print(verbose_message['achieve_or_beyond'])
 
-            if self._log:
-                print(
-                    LOG_SEGMENT_EXPANDED.format(
-                        id=last_segment.id + 1,
-                        trend=last_segment.trend,
-                        old_mc_id=last_segment.right_candle.id,
-                        new_mc_id=last_stroke.right_candle.id,
-                        old_oc_id=last_segment.right_ordinary_id,
-                        new_oc_id=last_stroke.right_ordinary_id,
-                        new_strokes=[
-                            i for i in range(
-                                last_segment.stroke_id_list[-1] + 1,
-                                last_stroke.id + 1
-                            )
-                        ]
+            log_event_segment_expanded(
+                log_level=log_level,
+                element=last_segment,
+                stroke=last_stroke,
+                new_strokes=[
+                    i for i in range(
+                        last_segment.stroke_id_list[-1] + 1,
+                        last_stroke.id + 1
                     )
-                )
+                ]
+            )
 
             for i in range(last_segment.stroke_id_list[-1] + 1, last_stroke.id + 1):
                 last_segment.stroke_id_list.append(i)
@@ -912,11 +906,18 @@ class ChanTheoryDynamic(ChanTheory):
             print(verbose_message['not_achieve_or_beyond'])
         return Action.NothingChanged
 
-    def generate_following_segment(self) -> Action:
+    def generate_following_segment(self,
+                                   log_level: LogLevel = LogLevel.Normal
+                                   ) -> Action:
         """
         Generate the following segment reversely.
         :return:
         """
+
+        # Handle parameter <log_level>.
+        if log_level is None:
+            log_level = self._log_level
+
         last_segment: Segment = self._segments[-1]
         last_stroke_in_segment: Stroke = self._strokes[last_segment.stroke_id_list[-1]]
 
@@ -992,24 +993,22 @@ class ChanTheoryDynamic(ChanTheory):
             )
             self._segments.append(new_segment)
 
-            if self._log:
-                print(
-                    LOG_SEGMENT_GENERATED.format(
-                        id=new_segment.id + 1,
-                        trend=new_segment.trend,
-                        left_mc_id=new_segment.left_merged_id,
-                        right_mc_id=new_segment.right_merged_id,
-                        left_oc_id=new_segment.left_ordinary_id,
-                        right_oc_id=new_segment.right_ordinary_id,
-                        strokes=new_segment.stroke_id_list
-                    )
-                )
+            log_event_segment_generated(
+                log_level=log_level,
+                new_element=new_segment
+            )
             # last_segment.right_stroke = self._strokes[stroke_n1.id - 1]
 
             return Action.StrokeGenerated
         return Action.NothingChanged
 
-    def generate_gap_segment(self) -> Action:
+    def generate_gap_segment(self,
+                             log_level: LogLevel = LogLevel.Normal
+                             ) -> Action:
+        # Handle parameter <log_level>.
+        if log_level is None:
+            log_level = self._log_level
+
         last_segment: Segment = self._segments[-1]
         last_stroke_in_segment: Stroke = self._strokes[last_segment.stroke_id_list[-1]]
 
@@ -1064,25 +1063,18 @@ class ChanTheoryDynamic(ChanTheory):
             if stroke_right.trend == last_segment.trend:
                 # 如果 stroke_left 的 id 与 last_segment 的右侧笔的 id 相差 2：
                 # 延伸 last_segment
-                if stroke_left.id - last_stroke_in_segment.id == 2:
-                    if self._log:
-                        print(
-                            LOG_SEGMENT_EXPANDED.format(
-                                id=last_segment.id + 1,
-                                trend=last_segment.trend,
-                                old_mc_id=last_segment.right_merged_id,
-                                new_mc_id=stroke_right.right_candle.id,
-                                old_oc_id=last_segment.right_ordinary_id,
-                                new_oc_id=stroke_right.right_ordinary_id,
-                                old_strokes=last_segment.stroke_id_list,
-                                new_strokes=[
-                                    i for i in range(
-                                        last_segment.stroke_id_list[-1] + 1,
-                                        stroke_right.id + 1
-                                    )
-                                ]
-                            )
+                log_event_segment_expanded(
+                    log_level=log_level,
+                    element=last_segment,
+                    stroke=stroke_right,
+                    new_strokes=[
+                        i for i in range(
+                            last_segment.stroke_id_list[-1] + 1,
+                            stroke_right.id + 1
                         )
+                    ]
+                )
+                if stroke_left.id - last_stroke_in_segment.id == 2:
                     for i in range(last_segment.stroke_id_list[-1] + 1, stroke_right.id + 1):
                         last_segment.stroke_id_list.append(i)
                     last_segment.right_stroke = stroke_right
@@ -1104,18 +1096,10 @@ class ChanTheoryDynamic(ChanTheory):
                     )
                     self._segments.append(new_segment)
 
-                    if self._log:
-                        print(
-                            LOG_SEGMENT_GENERATED.format(
-                                id=new_segment.id + 1,
-                                trend=new_segment.trend,
-                                left_mc_id=new_segment.left_merged_id,
-                                right_mc_id=new_segment.right_merged_id,
-                                left_oc_id=new_segment.left_ordinary_id,
-                                right_oc_id=new_segment.right_ordinary_id,
-                                strokes=new_segment.stroke_id_list
-                            )
-                        )
+                    log_event_segment_generated(
+                        log_level=log_level,
+                        new_element=new_segment
+                    )
                     return Action.SegmentGenerated
             # 如果 stroke_right 与 last_segment 反向：
             else:
@@ -1131,18 +1115,10 @@ class ChanTheoryDynamic(ChanTheory):
                 )
                 self._segments.append(new_segment)
 
-                if self._log:
-                    print(
-                        LOG_SEGMENT_GENERATED.format(
-                            id=new_segment.id + 1,
-                            trend=new_segment.trend,
-                            left_mc_id=new_segment.left_merged_id,
-                            right_mc_id=new_segment.right_merged_id,
-                            left_oc_id=new_segment.left_ordinary_id,
-                            right_oc_id=new_segment.right_ordinary_id,
-                            strokes=new_segment.stroke_id_list
-                        )
-                    )
+                log_event_segment_generated(
+                    log_level=log_level,
+                    new_element=new_segment
+                )
 
                 return Action.SegmentGenerated
 
@@ -1191,31 +1167,61 @@ class ChanTheoryDynamic(ChanTheory):
 
         return False
 
-    def generate_isolation_line(self):
+    def generate_isolation_line(self,
+                                log_level: LogLevel = LogLevel.Normal
+                                ) -> None:
+        """
+        Generate the stroke pivots.
+
+        :param log_level: enum LogLevel. Show log message if True.
+        :return:
+        """
+        # Handle parameter <log_level>.
+        if log_level is None:
+            log_level = self._log_level
+
+        # Log trying.
+        log_try_to_generate_isolation_line(log_level=log_level)
+
+        # Parameters validation.
+        if self.strokes_count == 0:
+            raise RuntimeError(
+                'No stroke data, run <generate_strokes> before.'
+            )
+
         last_segment: Segment = self._segments[-1]
         new_isolation_line: IsolationLine = IsolationLine(
             id=self.isolation_lines_count,
             candle=last_segment.left_candle
         )
         self._isolation_lines.append(new_isolation_line)
-        if self._log:
-            print(
-                LOG_ISOLATION_LINE_GENERATED.format(
-                    id=new_isolation_line.id + 1,
-                    mc_id=new_isolation_line.candle,
-                    oc_id=new_isolation_line.ordinary_id
-                )
-            )
+        log_event_isolation_line_generated(
+            log_level=log_level,
+            new_element=new_isolation_line
+        )
 
-    def generate_stroke_pivot(self) -> bool:
+    def generate_stroke_pivot(self,
+                              log_level: LogLevel = LogLevel.Normal
+                              ) -> bool:
         """
-        Generate the pivots.
+        Generate the stroke pivots.
+
+        :param log_level: enum LogLevel. Show log message if True.
         :return:
         """
-        if self.segments_count == 0:
-            if log_level.value >= LogLevel.Detailed.value:
-                print(f'\n  ○ 尝试生成笔中枢：目前尚无线段。')
-            return False
+
+        # Handle parameter <log_level>.
+        if log_level is None:
+            log_level = self._log_level
+
+        # Log trying.
+        log_try_to_generate_stroke_pivot(log_level=log_level)
+
+        # Parameters validation.
+        if self.strokes_count == 0:
+            raise RuntimeError(
+                'No stroke data, run <generate_strokes> before.'
+            )
 
         last_segment: Segment = self._segments[-1]
         if last_segment.strokes_count <= 3:
@@ -1346,20 +1352,17 @@ class ChanTheoryDynamic(ChanTheory):
         )
         self._stroke_pivots.append(new_stroke_pivots)
 
-        if self._log:
-            print(
-                LOG_STROKE_PIVOT_GENERATED.format(
-                    id=new_stroke_pivots.id + 1,
-                    high=new_stroke_pivots.high,
-                    low=new_stroke_pivots.low,
-                    left=new_stroke_pivots.left_ordinary_id,
-                    right=new_stroke_pivots.right_ordinary_id
-                )
-            )
+        log_event_stroke_pivot_generated(
+            log_level=log_level,
+            new_element=new_stroke_pivots
+        )
         
         return True
 
-    def run_step_by_step(self, high: float, low: float):
+    def run_step_by_step(self,
+                         high: float,
+                         low: float
+                         ) -> None:
         """
         Run step by step, with a pair of float.
 
@@ -1445,21 +1448,25 @@ class ChanTheoryDynamic(ChanTheory):
         Run with lots of data in pandas DataFrame format.
 
         :param df:    pandas DataFrame. A series of bar data, the index should be DatetimeIndex,
-                      and the columns should contains open, high, low, close and volume.
-        :param count: int. How many rows of df should be calculate.
+                      and the columns should contain open, high, low, close and volume.
+        :param count: int. How many rows of df should be calculated.
         :param log_level:
         :return: None.
         """
+
         # Handle parameters.
-        if count is None or count <= 0:
-            count = len(df)
         if log_level is None:
             log_level = self._log_level
 
+        if count is None or count <= 0 or count > len(df):
+            count = len(df)
+
         width: int = len(str(count - 1)) + 1
 
+        # Loop.
         for idx in range(count):
 
+            # Log: New turn.
             log_event_new_turn(log_level, idx, count)
 
             self.run_step_by_step(
@@ -1467,90 +1474,128 @@ class ChanTheoryDynamic(ChanTheory):
                 low=df.iloc[idx].at['low'].copy()
             )
 
-            if log_level.value >= LogLevel.Normal.value:
-                print(f'\n  ■ 处理完毕。')
+            self.log_turn_report()
 
-                # 合并K线
-                print(f'\n    合并K线数量： {self.merged_candles_count}。')
-                for i in range(1, 4):
-                    if self.merged_candles_count >= i:
-                        candle = self._merged_candles[-i]
-                        print(
-                            f'      向向左第{i}根合并K线：'
-                            f'自 {candle.left_ordinary_id} 至 {candle.right_ordinary_id}，'
-                            f'周期 = {candle.period}；'
-                        )
-                    else:
-                        print(f'      向向左第{i}根合并K线：不存在；')
+    def log_turn_report(self,
+                        log_level: Optional[LogLevel] = None
+                        ) -> None:
+        """
+        Log report when turn finish.
 
-                # 分型
-                print(f'\n    分型数量： {self.fractals_count}。')
-                for i in range(1, 3):
-                    if self.fractals_count >= i:
-                        fractal = self._fractals[-i]
-                        print(
-                            f'      向向左第{i}个分型：id = {fractal.id}，'
-                            f'pattern = {fractal.pattern.value}，'
-                            f'id（普通K线）= {fractal.ordinary_id}。'
-                        )
-                    else:
-                        print(f'      向向左第{i}个分型：不存在。')
+        :param log_level:
+        :return:
+        """
+        # Handle parameters.
+        if log_level is None:
+            log_level = self._log_level
 
-                # 笔
-                print(f'\n    笔数量： {self.strokes_count}。')
-                for i in range(1, 4):
-                    if self.strokes_count >= i:
-                        stroke = self._strokes[-i]
-                        print(
-                            f'      向左第{i}个笔：id = {stroke.id}，trend = {stroke.trend.value}，'
-                            f'idx（普通K线）= '
-                            f'{stroke.left_ordinary_id} ~ {stroke.right_ordinary_id}，'
-                            f'price = {stroke.left_price} ~ {stroke.right_price}。'
-                        )
-                    else:
-                        print(f'      向前左第{i}个笔：不存在。')
+        # Log turn finished.
+        if log_level.value < LogLevel.Simple.value:
+            return
+        else:
+            print(f'\n  ■ 处理完毕。')
 
-                # 线段
-                print(f'\n    线段数量： {self.segments_count}。')
-                for i in range(1, 4):
-                    if self.segments_count >= i:
-                        segment = self._segments[-i]
-                        print(
-                            f'      向向左第{i}个线段：id = {segment.id}，'
-                            f'trend = {segment.trend.value}，'
-                            f'idx（普通K线）= '
-                            f'{segment.left_ordinary_id} ~ {segment.right_ordinary_id}，'
-                            f'price = {segment.left_price} ~ {segment.right_price}，'
-                            f'笔 id = {[stroke_id for stroke_id in segment.stroke_id_list]}。'
-                        )
-                    else:
-                        print(f'      向向左第{i}个线段：不存在。')
+        if log_level.value < LogLevel.Normal.value:
+            return
 
-                # 笔中枢
-                print(f'\n    笔中枢数量： {self.stroke_pivots_count}。')
-                for i in range(1, 3):
-                    if self.stroke_pivots_count >= i:
-                        pivot = self._stroke_pivots[-i]
-                        print(
-                            f'      向向左第{i}个笔中枢：id = {pivot.id}，'
-                            f'idx（普通K线）= {pivot.left_ordinary_id} ~ {pivot.right_ordinary_id}，'
-                            f'price = {pivot.high} ~ {pivot.low}。'
-                        )
-                    else:
-                        print(f'      向向左第{i}个笔中枢：不存在。')
+        # Declare variable.
+        i: int      # loop counter.
+        count: int  # Show how many items.
+        width: int  # String width for printing.
 
-                # 段中枢
-                print(f'\n    段中枢数量： {self.segment_pivots_count}。')
-                for i in range(1, 3):
-                    if self.segment_pivots_count >= i:
-                        pivot = self._segment_pivots[-i]
-                        print(
-                            f'      向向左第{i}个段中枢：id = {pivot.id}，'
-                            f'idx（普通K线）= {pivot.left_ordinary_id} ~ {pivot.right_ordinary_id}，'
-                            f'price = {pivot.high} ~ {pivot.low}。'
-                        )
-                    else:
-                        print(f'      向向左第{i}个段中枢：不存在。')
+        # Log: Merged candles.
+        count = 4
+        width = len(str(count - 1)) + 1
+        print(f'\n    合并K线数量： {self.merged_candles_count}。')
+        for i in range(1, count):
+            if self.merged_candles_count >= i:
+                candle = self._merged_candles[-i]
+                print(
+                    f'      向左第{i:>{width}}根合并K线：'
+                    f'自 {candle.left_ordinary_id} 至 {candle.right_ordinary_id}，'
+                    f'周期 = {candle.period}；'
+                )
+            else:
+                print(f'      向左第{i:>{width}}根合并K线：不存在；')
+
+        # Log: Fractals.
+        count = 3
+        width = len(str(count - 1)) + 1
+        print(f'\n    分型数量： {self.fractals_count}。')
+        for i in range(1, count):
+            if self.fractals_count >= i:
+                fractal = self._fractals[-i]
+                print(
+                    f'      向左第{i:>{width}}个分型：id = {fractal.id}，'
+                    f'pattern = {fractal.pattern.value}，'
+                    f'id（普通K线）= {fractal.ordinary_id}。'
+                )
+            else:
+                print(f'      向左第{i:>{width}}个分型：不存在。')
+
+        # Log: Strokes.
+        count = 4
+        width = len(str(count - 1)) + 1
+        print(f'\n    笔数量： {self.strokes_count}。')
+        for i in range(1, count):
+            if self.strokes_count >= i:
+                stroke = self._strokes[-i]
+                print(
+                    f'      向左第{i:>{width}}个笔：id = {stroke.id}，trend = {stroke.trend.value}，'
+                    f'idx（普通K线）= '
+                    f'{stroke.left_ordinary_id} ~ {stroke.right_ordinary_id}，'
+                    f'price = {stroke.left_price} ~ {stroke.right_price}。'
+                )
+            else:
+                print(f'      向左第{i:>{width}}个笔：不存在。')
+
+        # Log: Segments.
+        count = 4
+        width = len(str(count - 1)) + 1
+        print(f'\n    线段数量： {self.segments_count}。')
+        for i in range(1, count):
+            if self.segments_count >= i:
+                segment = self._segments[-i]
+                print(
+                    f'      向左第{i:>{width}}个线段：id = {segment.id}，'
+                    f'trend = {segment.trend.value}，'
+                    f'idx（普通K线）= '
+                    f'{segment.left_ordinary_id} ~ {segment.right_ordinary_id}，'
+                    f'price = {segment.left_price} ~ {segment.right_price}，'
+                    f'笔 id = {[stroke_id for stroke_id in segment.stroke_id_list]}。'
+                )
+            else:
+                print(f'      向左第{i:>{width}}个线段：不存在。')
+
+        # Log: Stroke pivots.
+        count = 3
+        width = len(str(count - 1)) + 1
+        print(f'\n    笔中枢数量： {self.stroke_pivots_count}。')
+        for i in range(1, count):
+            if self.stroke_pivots_count >= i:
+                pivot = self._stroke_pivots[-i]
+                print(
+                    f'      向左第{i:>{width}}个笔中枢：id = {pivot.id}，'
+                    f'idx（普通K线）= {pivot.left_ordinary_id} ~ {pivot.right_ordinary_id}，'
+                    f'price = {pivot.high} ~ {pivot.low}。'
+                )
+            else:
+                print(f'      向左第{i:>{width}}个笔中枢：不存在。')
+
+        # Log: Segment pivots.
+        count = 3
+        width = len(str(count - 1)) + 1
+        print(f'\n    段中枢数量： {self.segment_pivots_count}。')
+        for i in range(1, count):
+            if self.segment_pivots_count >= i:
+                pivot = self._segment_pivots[-i]
+                print(
+                    f'      向左第{i:>{width}}个段中枢：id = {pivot.id}，'
+                    f'idx（普通K线）= {pivot.left_ordinary_id} ~ {pivot.right_ordinary_id}，'
+                    f'price = {pivot.high} ~ {pivot.low}。'
+                )
+            else:
+                print(f'      向左第{i:>{width}}个段中枢：不存在。')
 
     def plot(self,
              df: pd.DataFrame,
@@ -1751,7 +1796,7 @@ class ChanTheoryDynamic(ChanTheory):
             warn_too_much_data=1000
         )
 
-        if self._log_level >= LogLevel.Normal.value:
+        if self._log_level.value >= LogLevel.Normal.value:
             for k, v in mpf_config.items():
                 print(k, ': ', v)
 
